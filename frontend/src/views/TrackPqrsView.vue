@@ -1,0 +1,135 @@
+<template>
+  <div class="track-pqrs glass-panel animate-fade-in" style="max-width: 850px; margin: 0 auto;">
+    <h2>Consultar Estado de Trámite</h2>
+    <p class="text-muted mb-4">Ingrese aquí su Código Radicado y verifique el avance de sus Peticiones institucionales.</p>
+
+    <form @submit.prevent="buscarPqr" class="flex gap-4 align-center mb-4 p-4" style="background:var(--bg-color); border-radius: var(--radius-md);">
+      <input type="text" v-model="radicado" class="form-control" style="flex:1; border:none; padding:1.2rem; box-shadow:var(--shadow-sm); font-size:1.1rem" placeholder="Ej: PQR-2026414-87421" required />
+      <button type="submit" class="btn btn-primary" :disabled="loading" style="padding:1.2rem 2rem; font-size:1.1rem">
+        {{ loading ? 'Buscando...' : '🔍 Buscar' }}
+      </button>
+    </form>
+
+    <div v-if="error" class="alert alert-error animate-fade-in text-center">
+      <h3>Lo sentimos.</h3>
+      <p>{{ error }}</p>
+    </div>
+
+    <div v-if="resultado" class="result-card animate-fade-in mt-4">
+      <div class="status-banner" :class="resultado.estado.toLowerCase()">
+        <div class="flex justify-between align-center">
+          <div>
+            <h3 style="color:white; margin:0; font-size: 1.8rem">ESTADO: {{ resultado.estado }}</h3>
+            <p style="margin:0; opacity: 0.9; margin-top:0.2rem">Según directriz del Ministerio</p>
+          </div>
+          <div class="text-right">
+             <p style="margin:0; font-size:0.9rem; opacity:0.8">RADICADO OFICIAL</p>
+             <h2 style="color:white; margin:0">{{ resultado.radicadoAlfaNum }}</h2>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-4 mt-4">
+        <!-- CIUDADANO INFO -->
+        <div class="info-box">
+          <div class="box-header flex align-center gap-4">
+            <span style="font-size:1.5rem">👤</span><h4 style="margin:0">Datos Radicador</h4>
+          </div>
+          <div style="margin-top:1rem">
+            <p><strong>Cédula/NIT:</strong> {{ resultado.usuario.numeroDocumento }}</p>
+            <p><strong>Nombre:</strong> {{ resultado.usuario.nombreCompleto }}</p>
+          </div>
+        </div>
+        
+        <!-- ENTIDAD INFO -->
+        <div class="info-box">
+          <div class="box-header flex align-center gap-4">
+             <span style="font-size:1.5rem">🏛️</span><h4 style="margin:0">Información Entidad</h4>
+          </div>
+          <div style="margin-top:1rem">
+            <p><strong>Clasificación:</strong> Solicitud de Tipo {{ resultado.tipo }}</p>
+            <p><strong>Oficina Asignada:</strong> {{ resultado.entidad.nombre }} <span style="font-size:0.8rem" class="text-muted">({{resultado.entidad.codigo}})</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TIMELINE INFO -->
+      <div class="info-box mt-4 timeline-box">
+        <h4 style="color: #92400e; margin-bottom: 1rem; border-bottom: 1px solid #fcd34d; padding-bottom: 0.5rem">⏱️ Tiempos de Respuesta - Ley 1755</h4>
+        <div class="flex justify-between align-center">
+          <div>
+            <p class="text-muted" style="margin:0; font-size:0.9rem">FECHA INICIO TRAMITE</p>
+            <p style="font-size:1.1rem; font-weight:600">📅 {{ formatDate(resultado.fechaRadicacion) }}</p>
+          </div>
+          <div style="text-align:right">
+            <p class="text-muted" style="margin:0; font-size:0.9rem">FECHA TOPE RESPUESTA</p>
+            <p style="font-size:1.1rem; font-weight:700; color:var(--danger-color)">🛑 {{ formatDate(resultado.fechaMaximaRespuesta) }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SOLICITUD CONTENIDO -->
+      <div class="info-box mt-4" style="background:var(--bg-color)">
+        <h4>📜 "{{ resultado.conceptoMotivo }}"</h4>
+        <p class="text-muted" style="margin-top:1rem; font-size:1.05rem">{{ resultado.contenido }}</p>
+      </div>
+
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import axios from 'axios';
+
+const radicado = ref('');
+const loading = ref(false);
+const error = ref('');
+const resultado = ref(null);
+
+const buscarPqr = async () => {
+  loading.value = true;
+  error.value = '';
+  resultado.value = null;
+
+  try {
+    const res = await axios.get(`http://localhost:3000/api/pqrs/${radicado.value}`);
+    resultado.value = res.data.data;
+  } catch (err) {
+    error.value = err.response?.status === 404 
+       ? `No hemos encontrado evidencia u operación oficial para el radicado ${radicado.value}. Compruebe el código.` 
+       : 'Hubo un error de conexión con el Servidor Central.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+const formatDate = (dateStr) => {
+  return new Date(dateStr).toLocaleDateString('es-CO', {
+    timeZone: 'America/Bogota', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit'
+  });
+};
+</script>
+
+<style scoped>
+.alert { padding: 1.5rem; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.alert-error { background-color: #fef2f2; color: var(--danger-color); border-left: 5px solid var(--danger-color); }
+.status-banner {
+  padding: 2rem;
+  border-radius: var(--radius-lg);
+  color: white;
+  box-shadow: 0 10px 20px -5px rgba(0,0,0,0.2);
+}
+.status-banner.abierto { background-color: var(--primary-color); }
+.status-banner.en_tramite { background-color: #f59e0b; }
+.status-banner.cerrado { background-color: var(--secondary-dark); }
+.info-box {
+  background: white;
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  flex: 1;
+}
+.box-header { border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+.timeline-box { background-color: #fffbeb; border-color: #fcd34d; }
+</style>

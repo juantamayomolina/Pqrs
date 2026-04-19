@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id               Int         @id @default(autoincrement())
+  tipoDocumento    String      // Ej. CC, CE, NIT
+  numeroDocumento  String      @unique
+  nombreCompleto   String
+  email            String?     // Opcional si la pqr es anónima
+  telefono         String?
+  esVulnerable     Boolean     @default(false)
+  solicitudes      Solicitud[]
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Entidad {
+  id               Int         @id @default(autoincrement())
+  nombre           String
+  codigo           String      @unique
+  emailContacto    String?
+  solicitudes      Solicitud[]
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Solicitud {
+  id                  Int       @id @default(autoincrement())
+  radicadoAlfaNum     String    @unique // El radicado global/seguimiento
+  
+  // Relación recursiva para solicitudes hijas / traslados
+  radicadoPadreId     Int?
+  radicadoPadre       Solicitud?  @relation("SolicitudesHijas", fields: [radicadoPadreId], references: [id])
+  solicitudesHijas    Solicitud[] @relation("SolicitudesHijas")
+
+  // Relaciones
+  usuarioId           Int
+  usuario             Usuario    @relation(fields: [usuarioId], references: [id])
+  
+  entidadId           Int
+  entidad             Entidad    @relation(fields: [entidadId], references: [id])
+
+  // Detalles de PQRS
+  conceptoMotivo      String
+  tipo                String     // Peticion, Queja, Reclamo, Sugerencia
+  contenido           String
+
+  fechaRadicacion     DateTime   @default(now())
+  fechaMaximaRespuesta DateTime
+
+  // Metadatos y tracking
+  estado              String     @default("ABIERTO") // ABIERTO, EN_TRAMITE, CERRADO
+  
+  // Anexos almacenados como String/JSON para propósitos del prototipo
+  anexosUrls          String?
+
+  respuestas          Respuesta[]
+
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+}
+
+model Respuesta {
+  id                  Int       @id @default(autoincrement())
+  radicadoOficio      String    @unique
+  tipo                String    // Peticion de información, respuesta fondo, traslado
+  contenido           String
+  anexosUrls          String?   
+  
+  fechaRespuesta      DateTime  @default(now())
+
+  // Relación a solicitud
+  solicitudId         Int
+  solicitud           Solicitud @relation(fields: [solicitudId], references: [id])
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}

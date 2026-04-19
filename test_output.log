@@ -1,0 +1,44 @@
+
+> pqrs@1.0.0 test
+> jest
+
+FAIL src/routes/pqrs.routes.test.js
+  ● Test suite failed to run
+
+    PrismaClientInitializationError: `PrismaClient` needs to be constructed with a non-empty, valid `PrismaClientOptions`:
+
+    ```
+    new PrismaClient({
+      ...
+    })
+    ```
+
+    or
+
+    ```
+    constructor() {
+      super({ ... });
+    }
+    ```
+
+    [0m [90m 1 |[39m [36mconst[39m { [33mPrismaClient[39m } [33m=[39m require([32m'@prisma/client'[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 2 |[39m [36mconst[39m prisma [33m=[39m [36mnew[39m [33mPrismaClient[39m()[33m;[39m
+     [90m   |[39m                [31m[1m^[22m[39m
+     [90m 3 |[39m [36mconst[39m { calcularFechaMaximaRespuesta[33m,[39m obtenerDiasHabilesPorTipo } [33m=[39m require([32m'../services/fechas.service'[39m)[33m;[39m
+     [90m 4 |[39m
+     [90m 5 |[39m [36mconst[39m crearSolicitud [33m=[39m [36masync[39m (req[33m,[39m res) [33m=>[39m {[0m
+
+                
+      at new t (node_modules/@prisma/client/src/runtime/getPrismaClient.ts:320:15)
+      at Object.<anonymous> (src/controllers/pqrs.controller.js:2:16)
+      at Object.require (src/routes/pqrs.routes.js:2:46)
+      at Object.require (src/app.js:16:20)
+      at Object.require (src/routes/pqrs.routes.test.js:2:13)
+
+PASS src/services/fechas.service.test.js
+
+Test Suites: 1 failed, 1 passed, 2 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        0.87 s, estimated 1 s
+Ran all test suites.

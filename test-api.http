@@ -1,0 +1,28 @@
+### Prueba Básica
+GET http://localhost:3000/api/health
+
+### 
+### Radicar una nueva PQRS (POST)
+###
+POST http://localhost:3000/api/pqrs
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "1234567890",
+  "nombreCompleto": "Carlos Perez",
+  "email": "carlos@ejemplo.com",
+  "telefono": "3001234567",
+  "esVulnerable": false,
+  "entidadCodigo": "ENT-001",
+  "entidadNombre": "Secretaría de Educación",
+  "tipoSolicitud": "PETICION",
+  "conceptoMotivo": "Cupo Escolar",
+  "contenido": "Deseo verificar cómo puedo solicitar un cupo para el proximo año escolar.",
+  "anexosUrls": "[\"http://foto1.jpg\"]"
+}
+
+###
+### Obtener estado e información de una PQRS (Reemplaza el Radicado con el valor obtenido del POST anterior)
+###
+GET http://localhost:3000/api/pqrs/PQR-XXX-YYYY
