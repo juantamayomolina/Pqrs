@@ -6,7 +6,6 @@ const crearSolicitud = async (req, res) => {
   try {
     const { 
       tipoDocumento, numeroDocumento, nombreCompleto, email, telefono, esVulnerable,
-      entidadNombre, entidadCodigo,
       conceptoMotivo, tipoSolicitud, contenido, anexosUrls
     } = req.body;
 
@@ -18,10 +17,15 @@ const crearSolicitud = async (req, res) => {
         create: { tipoDocumento, numeroDocumento, nombreCompleto, email, telefono, esVulnerable }
       });
 
+      // Auto-assign global entity information defined in the Initial Setup.
+      const config = await tx.configuracionSistema.findUnique({ where: { id: 1 } });
+      const entidadNombreGlobal = config ? config.razonSocial : 'Entidad Principal';
+      const entidadCodigoGlobal = 'MAIN-ENT';
+
       const entidad = await tx.entidad.upsert({
-        where: { codigo: entidadCodigo },
-        update: { nombre: entidadNombre },
-        create: { codigo: entidadCodigo, nombre: entidadNombre }
+        where: { codigo: entidadCodigoGlobal },
+        update: { nombre: entidadNombreGlobal },
+        create: { codigo: entidadCodigoGlobal, nombre: entidadNombreGlobal }
       });
 
       // Lógica de fechas
@@ -85,4 +89,45 @@ const obtenerSolicitud = async (req, res) => {
   }
 };
 
-module.exports = { crearSolicitud, obtenerSolicitud };
+const getGestionPqrs = async (req, res) => {
+  try {
+    const { rol, id } = req.user;
+    
+    let whereClause = {};
+    if (rol === 'AGENTE') {
+      whereClause.agenteAsignadoId = id;
+    }
+
+    const solicitudes = await prisma.solicitud.findMany({
+      where: whereClause,
+      include: {
+        usuario: true,
+        entidad: true,
+        agenteAsignado: { select: { id: true, nombreCompleto: true, email: true } }
+      },
+      orderBy: { fechaRadicacion: 'desc' }
+    });
+
+    res.status(200).json({ data: solicitudes });
+  } catch (error) {
+    res.status(500).json({ message: 'Error cargando panel de gestión', error: error.message });
+  }
+};
+
+const asignarPqrs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { agenteAsignadoId } = req.body;
+
+    const solicitud = await prisma.solicitud.update({
+      where: { id: parseInt(id) },
+      data: { agenteAsignadoId: parseInt(agenteAsignadoId) }
+    });
+
+    res.status(200).json({ message: 'Agente asignado exitosamente', data: solicitud });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al asignar agente', error: error.message });
+  }
+}
+
+module.exports = { crearSolicitud, obtenerSolicitud, getGestionPqrs, asignarPqrs };

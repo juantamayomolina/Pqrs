@@ -14,6 +14,13 @@ app.get('/api/health', (req, res) => {
 
 // Rutas de negocio
 const pqrsRoutes = require('./routes/pqrs.routes');
+const setupRoutes = require('./routes/setup.routes');
+const usuarioRoutes = require('./routes/usuario.routes');
+const authRoutes = require('./routes/auth.routes');
+
 app.use('/api/pqrs', pqrsRoutes);
+app.use('/api/setup', setupRoutes);
+app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/auth', authRoutes);
 
 module.exports = app;

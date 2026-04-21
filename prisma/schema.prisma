@@ -15,7 +15,12 @@ model Usuario {
   email            String?     // Opcional si la pqr es anónima
   telefono         String?
   esVulnerable     Boolean     @default(false)
-  solicitudes      Solicitud[]
+  
+  rol              String      @default("USUARIO_EXTERNO") // USUARIO_EXTERNO, AGENTE, ADMIN
+  passwordHash     String?     
+
+  solicitudes      Solicitud[] @relation("Radicador")
+  solicitudesAsignadas Solicitud[] @relation("Asignadas")
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -43,7 +48,10 @@ model Solicitud {
 
   // Relaciones
   usuarioId           Int
-  usuario             Usuario    @relation(fields: [usuarioId], references: [id])
+  usuario             Usuario    @relation("Radicador", fields: [usuarioId], references: [id])
+  
+  agenteAsignadoId    Int?
+  agenteAsignado      Usuario?   @relation("Asignadas", fields: [agenteAsignadoId], references: [id])
   
   entidadId           Int
   entidad             Entidad    @relation(fields: [entidadId], references: [id])
@@ -83,4 +91,15 @@ model Respuesta {
 
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+}
+
+model ConfiguracionSistema {
+  id            Int      @id @default(1)
+  tipoPersona   String   // 'NATURAL' o 'JURIDICA'
+  razonSocial   String
+  descripcion   String
+  configurado   Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

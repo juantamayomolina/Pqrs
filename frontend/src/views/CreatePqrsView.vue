@@ -17,7 +17,7 @@
       <template v-if="!success">
         <div class="form-sections flex gap-8">
           <!-- Col 1: Datos Usuario -->
-          <div style="flex:1">
+          <div style="flex:1" v-if="!isLoggedIn">
             <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom:0.5rem">1. Ciudadano (Radicador)</h3>
             <div class="form-group mt-4">
               <label class="form-label">Tipo de Documento</label>
@@ -29,35 +29,34 @@
             </div>
             <div class="form-group">
               <label class="form-label">Número de Documento</label>
-              <input type="text" v-model="form.numeroDocumento" class="form-control" required />
+              <input type="text" v-model="form.numeroDocumento" class="form-control" @blur="buscarUsuario" required />
             </div>
             <div class="form-group">
               <label class="form-label">Nombre Completo</label>
-              <input type="text" v-model="form.nombreCompleto" class="form-control" required />
+              <input type="text" v-model="form.nombreCompleto" class="form-control" :disabled="isUserReadOnly" required />
             </div>
             <div class="form-group">
               <label class="form-label">Correo Electrónico (Para recibir notificaciones)</label>
-              <input type="email" v-model="form.email" class="form-control" />
+              <input type="email" v-model="form.email" class="form-control" :disabled="isUserReadOnly" />
             </div>
             <div class="form-group bg-light" style="flex-direction:row; align-items:center; gap: 0.75rem; padding: 1rem; border-radius: var(--radius-sm)">
               <input type="checkbox" v-model="form.esVulnerable" id="vul" style="width: 1.25rem; height: 1.25rem; accent-color: var(--primary-color);" />
               <label for="vul" class="form-label" style="margin:0; cursor:pointer;" title="Permite acelerar los tramites frente a entidades según marco legal">¿Pertenece a Población Vulnerable?</label>
             </div>
           </div>
+          
+          <div style="flex:1" v-else>
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom:0.5rem">1. Radicador</h3>
+            <div class="alert alert-success mt-4">
+              <p><strong>Sesión Activa:</strong> Radicando a nombre de {{ loggedUser.nombreCompleto }} ({{ loggedUser.numeroDocumento }}).</p>
+              <br><br>
+              <em class="text-muted" style="font-size: 0.9rem">Sus datos personales han sido vinculados automáticamente a esta solicitud por motivos de trazabilidad y seguridad institucional.</em>
+            </div>
+          </div>
 
           <!-- Col 2: Datos Solicitud -->
           <div style="flex:1">
             <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom:0.5rem">2. Detalles de Solicitud</h3>
-            <div class="form-group mt-4 flex gap-4" style="flex-direction: row;">
-              <div style="flex: 1">
-                <label class="form-label">Cód. Entidad</label>
-                <input type="text" v-model="form.entidadCodigo" class="form-control" placeholder="Ej: MIN-SALUD" required />
-              </div>
-              <div style="flex: 2">
-                <label class="form-label">Nombre Mínisterio o Entidad</label>
-                <input type="text" v-model="form.entidadNombre" class="form-control" placeholder="Ministerio de Salud" required />
-              </div>
-            </div>
             <div class="form-group">
               <label class="form-label">Tipo de Solicitud (Clasificación)</label>
               <select v-model="form.tipoSolicitud" class="form-control" required>
@@ -92,18 +91,60 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
 const form = ref({
   tipoDocumento: 'CC', numeroDocumento: '', nombreCompleto: '', email: '', esVulnerable: false,
-  entidadCodigo: '', entidadNombre: '', tipoSolicitud: 'PETICION', conceptoMotivo: '', contenido: ''
+  tipoSolicitud: 'PETICION', conceptoMotivo: '', contenido: ''
 });
 
 const loading = ref(false);
 const error = ref('');
 const success = ref(false);
 const successData = ref({});
+const isUserReadOnly = ref(false);
+const isLoggedIn = ref(false);
+const loggedUser = ref(null);
+
+onMounted(() => {
+  const token = localStorage.getItem('auth_token');
+  const user = localStorage.getItem('auth_user');
+  if (token && user) {
+    isLoggedIn.value = true;
+    loggedUser.value = JSON.parse(user);
+    form.value.numeroDocumento = loggedUser.value.numeroDocumento;
+    form.value.tipoDocumento = loggedUser.value.tipoDocumento;
+    form.value.nombreCompleto = loggedUser.value.nombreCompleto;
+    form.value.email = loggedUser.value.email || '';
+  }
+});
+
+const buscarUsuario = async () => {
+  if (!form.value.numeroDocumento || !form.value.tipoDocumento) return;
+  
+  try {
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const res = await axios.get(`${backendUrl}/api/usuarios/buscar`, {
+      params: {
+        tipoDocumento: form.value.tipoDocumento,
+        numeroDocumento: form.value.numeroDocumento
+      }
+    });
+
+    if (res.data && res.data.data) {
+      form.value.nombreCompleto = res.data.data.nombreCompleto;
+      form.value.email = res.data.data.email || '';
+      isUserReadOnly.value = true;
+    }
+  } catch (err) {
+    if (isUserReadOnly.value) {
+      form.value.nombreCompleto = '';
+      form.value.email = '';
+    }
+    isUserReadOnly.value = false;
+  }
+};
 
 const submitForm = async () => {
   loading.value = true;

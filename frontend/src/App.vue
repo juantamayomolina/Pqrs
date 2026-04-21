@@ -2,10 +2,11 @@
   <div id="layout-wrapper">
     <header class="app-header">
       <div class="container flex justify-between align-center">
-        <h2 class="logo"><router-link to="/">🏛️ Gestión PQRS</router-link></h2>
+        <h2 class="logo"><router-link to="/">Gestión PQRS</router-link></h2>
         <nav class="main-nav">
           <router-link to="/" class="nav-link active-link">Inicio</router-link>
-          <router-link to="/radicar" class="nav-link btn btn-secondary" style="color:white">Radicar PQR</router-link>
+          <router-link to="/login" class="nav-link active-link">Acceder al Panel</router-link>
+          <router-link to="/radicar" class="nav-link btn btn-secondary" style="color:white">Radicar PQRS</router-link>
         </nav>
       </div>
     </header>

@@ -19,12 +19,12 @@
       <div class="status-banner" :class="resultado.estado.toLowerCase()">
         <div class="flex justify-between align-center">
           <div>
-            <h3 style="color:white; margin:0; font-size: 1.8rem">ESTADO: {{ resultado.estado }}</h3>
-            <p style="margin:0; opacity: 0.9; margin-top:0.2rem">Según directriz del Ministerio</p>
+            <h2 style="color:white; margin:0; font-size: 1.8rem">ESTADO: </h2>
+            <p style="color:white; margin:0; opacity: 0.9; margin-top:0.2rem">{{ resultado.estado }}</p>
           </div>
           <div class="text-right">
-             <p style="margin:0; font-size:0.9rem; opacity:0.8">RADICADO OFICIAL</p>
-             <h2 style="color:white; margin:0">{{ resultado.radicadoAlfaNum }}</h2>
+             <h2 style="color:white; margin:0; font-size:1.8rem">No. DE RADICADO:</h2>
+             <p style="color:white; margin:0; opacity:0.9">{{ resultado.radicadoAlfaNum }}</p>
           </div>
         </div>
       </div>
