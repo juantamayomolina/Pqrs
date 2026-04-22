@@ -81,18 +81,19 @@ const login = async (req, res) => {
 // Endpoint utilitario para crear el primer ADMIN
 const createAdmin = async (req, res) => {
   try {
-    const { numeroDocumento, password, nombreCompleto } = req.body;
+    const { numeroDocumento, password, nombreCompleto, rolParam } = req.body;
     if (!password) return res.status(400).json({message: 'Especifique contraseña'});
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
+    const asignativeRol = rolParam || 'ADMIN';
     
     const admin = await prisma.usuario.upsert({
       where: { numeroDocumento },
-      update: { passwordHash, rol: 'ADMIN' },
-      create: { tipoDocumento: 'CC', numeroDocumento, nombreCompleto, passwordHash, rol: 'ADMIN' }
+      update: { passwordHash, rol: asignativeRol },
+      create: { tipoDocumento: 'CC', numeroDocumento, nombreCompleto, passwordHash, rol: asignativeRol }
     });
     
-    res.status(201).json({ message: 'Admin configurado', admin });
+    res.status(201).json({ message: 'Cuenta interna configurada', admin });
   } catch (err) {
     res.status(500).json({ message: 'Error creando admin', error: err.message });
   }

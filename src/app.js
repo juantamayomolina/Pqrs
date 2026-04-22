@@ -17,10 +17,12 @@ const pqrsRoutes = require('./routes/pqrs.routes');
 const setupRoutes = require('./routes/setup.routes');
 const usuarioRoutes = require('./routes/usuario.routes');
 const authRoutes = require('./routes/auth.routes');
+const superadminRoutes = require('./routes/superadmin.routes');
 
 app.use('/api/pqrs', pqrsRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/superadmin', superadminRoutes);
 
 module.exports = app;

@@ -37,7 +37,7 @@ const routes = [
     path: '/panel',
     name: 'Panel',
     component: () => import('../views/PanelView.vue'),
-    meta: { requiresAuth: true, internalRoles: ['ADMIN', 'AGENTE'] }
+    meta: { requiresAuth: true, internalRoles: ['ADMIN', 'AGENTE', 'SUPERADMIN'] }
   }
 ];
 

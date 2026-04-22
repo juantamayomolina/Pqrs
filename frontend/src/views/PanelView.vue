@@ -11,10 +11,16 @@
       </div>
     </nav>
 
-    <div class="panel-content animate-fade-in">
-      <div v-if="loading" class="text-center mt-4">
-        <p>Cargando información...</p>
-      </div>
+    <div class="panel-tabs" v-if="user && user.rol === 'SUPERADMIN'">
+      <button :class="['tab-btn', activeTab === 'pqrs' ? 'active' : '']" @click="activeTab = 'pqrs'">Bandeja PQRS</button>
+      <button :class="['tab-btn', activeTab === 'db' ? 'active' : '']" @click="activeTab = 'db'">Gestión de Base de Datos</button>
+    </div>
+
+    <template v-if="activeTab === 'pqrs'">
+      <div class="panel-content animate-fade-in">
+        <div v-if="loading" class="text-center mt-4">
+          <p>Cargando información...</p>
+        </div>
       <div v-if="error" class="alert alert-error">{{ error }}</div>
 
       <div class="table-card glass-panel" v-if="!loading && solicitudes.length > 0">
@@ -58,43 +64,52 @@
     </div>
 
     <!-- Modal de Asignación -->
-    <div v-if="showModal" class="modal-overlay" @click.self="cerrarModal">
-      <div class="modal-content animate-fade-in">
-        <div class="modal-header">
-          <h3>Asignar PQRS No. {{ pqrsSeleccionada?.radicadoAlfaNum }}</h3>
-          <button class="btn-close" @click="cerrarModal">×</button>
-        </div>
-        <div class="modal-body">
-          <input type="text" v-model="filtroAgentes" placeholder="🔍 Buscar agente por nombre o rol..." class="form-control mb-4" />
-          <div class="table-container">
-            <table class="data-table" style="margin-top:0">
-              <thead>
-                <tr>
-                  <th>Nombre del Agente</th>
-                  <th>Rol</th>
-                  <th>Correo Asignado</th>
-                  <th>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="agente in agentesFiltrados" :key="agente.id">
-                  <td>{{ agente.nombreCompleto }}</td>
-                  <td><span class="badge">{{ agente.rol }}</span></td>
-                  <td>{{ agente.email }}</td>
-                  <td>
-                    <button class="btn btn-sm btn-primary" style="padding:0.4rem 1rem" @click="confirmarAsignacion(agente.id)">
-                      Seleccionar
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div v-if="agentesFiltrados.length === 0" class="text-center mt-4 text-muted">No se encontraron agentes aplicando el filtro actual.</div>
+    <Teleport to="body">
+      <div v-if="showModal" class="modal-overlay" @click.self="cerrarModal">
+        <div class="modal-content animate-fade-in">
+          <div class="modal-header">
+            <h3>Asignar Agente</h3>
+            <button class="btn-close" @click="cerrarModal">×</button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom: 1rem; color:#666">PQRS No. <strong>{{ pqrsSeleccionada?.radicadoAlfaNum }}</strong></p>
+            <input type="text" v-model="filtroAgentes" placeholder="🔍 Buscar agente por nombre o rol..." class="form-control mb-4" />
+            <div class="table-container">
+              <table class="data-table" style="margin-top:0">
+                <thead>
+                  <tr>
+                    <th>Nombre del Agente</th>
+                    <th>Rol</th>
+                    <th>Correo Asignado</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="agente in agentesFiltrados" :key="agente.id">
+                    <td>{{ agente.nombreCompleto }}</td>
+                    <td><span class="badge">{{ agente.rol }}</span></td>
+                    <td>{{ agente.email }}</td>
+                    <td>
+                      <button class="btn btn-sm btn-primary" style="padding:0.4rem 1rem" @click="confirmarAsignacion(agente.id)">
+                        Seleccionar
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-if="agentesFiltrados.length === 0" class="text-center mt-4 text-muted">No se encontraron agentes aplicando el filtro actual.</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
+      </template>
 
+      <template v-if="activeTab === 'db'">
+        <div class="panel-content animate-fade-in" style="max-width: 1400px; padding: 1rem">
+          <DatabaseManager />
+        </div>
+      </template>
   </div>
 </template>
 
@@ -102,6 +117,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+import DatabaseManager from '../components/DatabaseManager.vue';
 
 const router = useRouter();
 const user = ref(null);
@@ -111,12 +127,14 @@ const agentes = ref([]);
 const loading = ref(true);
 const error = ref('');
 
+const activeTab = ref('pqrs');
+
 // Modal state
 const showModal = ref(false);
 const pqrsSeleccionada = ref(null);
 const filtroAgentes = ref('');
 
-const isAdmin = computed(() => user.value && user.value.rol === 'ADMIN');
+const isAdmin = computed(() => user.value && (user.value.rol === 'ADMIN' || user.value.rol === 'SUPERADMIN'));
 
 onMounted(() => {
   const localToken = localStorage.getItem('auth_token');
@@ -257,6 +275,31 @@ const logout = () => {
   margin: 0 auto;
 }
 
+.panel-tabs {
+  display: flex;
+  justify-content: center;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+.tab-btn:hover {
+  color: var(--primary-color);
+}
+.tab-btn.active {
+  color: var(--primary-color);
+  border-bottom: 3px solid var(--primary-color);
+}
+
 .table-card {
   padding: 1.5rem;
 }
@@ -315,12 +358,12 @@ const logout = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 .modal-content {
   background: white;
-  padding: 2rem;
+  padding: 1.5rem 2rem;
   border-radius: var(--radius-md);
   width: 90%;
   max-width: 650px;
@@ -328,13 +371,15 @@ const logout = () => {
   box-shadow: 0 10px 25px rgba(0,0,0,0.2);
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
   border-bottom: 1px solid #eee;
   padding-bottom: 1rem;
 }
@@ -361,7 +406,9 @@ const logout = () => {
 
 .modal-body {
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
+  box-sizing: border-box;
 }
 
 .table-container {

@@ -4,6 +4,6 @@ const { getUsuarioByDoc, getAgentes } = require('../controllers/usuario.controll
 const { requireAuth, requireRole } = require('../middlewares/auth.middleware');
 
 router.get('/buscar', getUsuarioByDoc);
-router.get('/agentes', requireAuth, requireRole(['ADMIN']), getAgentes);
+router.get('/agentes', requireAuth, requireRole(['ADMIN', 'SUPERADMIN']), getAgentes);
 
 module.exports = router;

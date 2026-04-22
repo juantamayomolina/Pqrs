@@ -21,7 +21,7 @@
 
     <footer class="app-footer">
       <div class="container text-center text-muted">
-        <p>&copy; 2026 Plataforma Ciudadana para Reporte y Seguimiento Institucional.</p>
+        <p>&copy; 2026 Plataforma para la gestión de PQRS.</p>
       </div>
     </footer>
   </div>

@@ -52,7 +52,8 @@ const handleLogin = async () => {
     localStorage.setItem('auth_user', JSON.stringify(res.data.user));
     
     // Redirect logic based on role
-    if (res.data.user.rol === 'ADMIN' || res.data.user.rol === 'AGENTE') {
+    const rol = res.data.user.rol;
+    if (rol === 'ADMIN' || rol === 'AGENTE' || rol === 'SUPERADMIN') {
       window.location.href = '/panel';
     } else {
       window.location.href = '/'; 
