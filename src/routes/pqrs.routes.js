@@ -7,8 +7,8 @@ const router = Router();
 // POST /api/pqrs
 router.post('/', crearSolicitud);
 
-router.get('/gestion', requireAuth, requireRole(['ADMIN', 'AGENTE', 'SUPERADMIN']), getGestionPqrs);
-router.put('/:id/asignar', requireAuth, requireRole(['ADMIN', 'SUPERADMIN']), asignarPqrs);
+router.get('/gestion', requireAuth, requireRole(['ADMIN', 'AGENTE', 'SUPERADMIN', 'GESTOR']), getGestionPqrs);
+router.put('/:id/asignar', requireAuth, requireRole(['ADMIN', 'SUPERADMIN', 'GESTOR']), asignarPqrs);
 
 // GET /api/pqrs/:radicado
 router.get('/:radicado', obtenerSolicitud);

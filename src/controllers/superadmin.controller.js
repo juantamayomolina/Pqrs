@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // Lista estricta de mapeo para evitar colisiones a otras dbs (si las hubiera) y garantizar la capa de seguridad.
-const ALLOWED_MODELS = ['usuario', 'entidad', 'solicitud', 'configuracionSistema'];
+const ALLOWED_MODELS = ['usuario', 'entidad', 'solicitud', 'configuracionSistema', 'area'];
 
 const getTablas = (req, res) => {
   res.status(200).json({ data: ALLOWED_MODELS });

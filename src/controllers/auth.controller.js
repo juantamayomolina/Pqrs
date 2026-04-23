@@ -63,7 +63,13 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, numeroDocumento: user.numeroDocumento, rol: user.rol, nombreCompleto: user.nombreCompleto },
+      { 
+        id: user.id, 
+        numeroDocumento: user.numeroDocumento, 
+        rol: user.rol, 
+        nombreCompleto: user.nombreCompleto,
+        areaId: user.areaId
+      },
       SECRET_KEY,
       { expiresIn: '24h' }
     );
@@ -71,7 +77,15 @@ const login = async (req, res) => {
     res.status(200).json({
       message: 'Sesión iniciada',
       token,
-      user: { id: user.id, nombreCompleto: user.nombreCompleto, rol: user.rol, numeroDocumento: user.numeroDocumento, tipoDocumento: user.tipoDocumento, email: user.email }
+      user: { 
+        id: user.id, 
+        nombreCompleto: user.nombreCompleto, 
+        rol: user.rol, 
+        numeroDocumento: user.numeroDocumento, 
+        tipoDocumento: user.tipoDocumento, 
+        email: user.email,
+        areaId: user.areaId
+      }
     });
   } catch (error) {
     res.status(500).json({ message: 'Error de servidor al iniciar sesión', error: error.message });
