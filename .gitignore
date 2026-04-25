@@ -1,9 +1,7 @@
 node_modules
 # Keep environment variables out of version control
-dev.db
 .env
 walkthrough.md
 backup_chat_22042026.txt
 /generated/prisma
-
 backup_chat_22042026.txt
