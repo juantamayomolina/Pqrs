@@ -53,7 +53,9 @@ const handleLogin = async () => {
     
     // Redirect logic based on role
     const rol = res.data.user.rol;
-    if (rol === 'ADMIN' || rol === 'AGENTE' || rol === 'SUPERADMIN') {
+    const panelRoles = ['ADMIN', 'AGENTE', 'SUPERADMIN', 'GESTOR'];
+    
+    if (panelRoles.includes(rol)) {
       window.location.href = '/panel';
     } else {
       window.location.href = '/'; 
