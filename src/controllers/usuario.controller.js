@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { getSubTreeIds } = require('../services/area.service');
 
 const getUsuarioByDoc = async (req, res) => {
   try {
@@ -27,7 +28,7 @@ const getUsuarioByDoc = async (req, res) => {
 const getAgentes = async (req, res) => {
   try {
     const agentes = await prisma.usuario.findMany({
-      where: { rol: { in: ['ADMIN', 'AGENTE'] } },
+      where: { rol: { in: ['ADMIN', 'AGENTE', 'GESTOR'] } },
       select: { id: true, nombreCompleto: true, email: true, rol: true }
     });
     res.status(200).json({ data: agentes });
@@ -36,4 +37,34 @@ const getAgentes = async (req, res) => {
   }
 }
 
-module.exports = { getUsuarioByDoc, getAgentes };
+const getAssignees = async (req, res) => {
+  try {
+    const { rol, areaId } = req.user;
+    
+    let validAreaIds = [];
+    if (rol === 'GESTOR') {
+      validAreaIds = await getSubTreeIds(areaId);
+    } else {
+      const allAreas = await prisma.area.findMany({ select: { id: true }});
+      validAreaIds = allAreas.map(a => a.id);
+    }
+
+    const areas = await prisma.area.findMany({
+      where: { id: { in: validAreaIds } }
+    });
+    
+    const usuarios = await prisma.usuario.findMany({
+      where: { 
+        areaId: { in: validAreaIds },
+        rol: { in: ['AGENTE', 'GESTOR', 'ADMIN'] }
+      },
+      select: { id: true, nombreCompleto: true, email: true, rol: true, areaId: true }
+    });
+
+    res.status(200).json({ data: { areas, usuarios } });
+  } catch (error) {
+    res.status(500).json({ message: 'Error cargando nodos', error: error.message });
+  }
+}
+
+module.exports = { getUsuarioByDoc, getAgentes, getAssignees };

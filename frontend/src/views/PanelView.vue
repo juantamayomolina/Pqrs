@@ -33,7 +33,7 @@
               <th>Fecha</th>
               <th>Asunto</th>
               <th>Estado</th>
-              <th v-if="isAdmin">Asignado A</th>
+              <th v-if="canAssign">Asignado A</th>
             </tr>
           </thead>
           <tbody>
@@ -43,14 +43,14 @@
               <td>{{ new Date(pqrs.fechaRadicacion).toLocaleDateString() }}</td>
               <td>{{ pqrs.conceptoMotivo }}</td>
               <td>{{ pqrs.estado }}</td>
-              <td v-if="isAdmin">
+              <td v-if="canAssign">
                 <button 
                   @click="abrirModalAsignacion(pqrs)" 
                   class="btn btn-sm" 
-                  :class="pqrs.agenteAsignadoId ? 'btn-secondary' : 'btn-primary'"
-                  :style="pqrs.agenteAsignadoId ? 'color:white; font-size:0.85rem; padding:0.4rem 0.8rem' : 'font-size:0.85rem; padding:0.4rem 0.8rem'"
+                  :class="pqrs.agenteAsignadoId || pqrs.areaAsignadaId ? 'btn-secondary' : 'btn-primary'"
+                  :style="pqrs.agenteAsignadoId || pqrs.areaAsignadaId ? 'color:white; font-size:0.85rem; padding:0.4rem 0.8rem' : 'font-size:0.85rem; padding:0.4rem 0.8rem'"
                 >
-                  {{ pqrs.agenteAsignadoId ? pqrs.agenteAsignado?.nombreCompleto : 'Asignar Agente' }}
+                  {{ pqrs.agenteAsignadoId ? pqrs.agenteAsignado?.nombreCompleto : (pqrs.areaAsignadaId ? pqrs.areaAsignada?.nombre : 'Asignar') }}
                 </button>
               </td>
             </tr>
@@ -73,32 +73,65 @@
           </div>
           <div class="modal-body">
             <p style="margin-bottom: 1rem; color:#666">PQRS No. <strong>{{ pqrsSeleccionada?.radicadoAlfaNum }}</strong></p>
-            <input type="text" v-model="filtroAgentes" placeholder="🔍 Buscar agente por nombre o rol..." class="form-control mb-4" />
-            <div class="table-container">
-              <table class="data-table" style="margin-top:0">
-                <thead>
-                  <tr>
-                    <th>Nombre del Agente</th>
-                    <th>Rol</th>
-                    <th>Correo Asignado</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="agente in agentesFiltrados" :key="agente.id">
-                    <td>{{ agente.nombreCompleto }}</td>
-                    <td><span class="badge">{{ agente.rol }}</span></td>
-                    <td>{{ agente.email }}</td>
-                    <td>
-                      <button class="btn btn-sm btn-primary" style="padding:0.4rem 1rem" @click="confirmarAsignacion(agente.id)">
-                        Seleccionar
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <div v-if="agentesFiltrados.length === 0" class="text-center mt-4 text-muted">No se encontraron agentes aplicando el filtro actual.</div>
+            
+            <div style="display:flex; gap:1rem; margin-bottom:1.5rem">
+              <button :class="['btn', assignMode === 'persona' ? 'btn-primary' : 'btn-secondary']" @click="assignMode='persona'" style="flex:1">A Empleado</button>
+              <button :class="['btn', assignMode === 'area' ? 'btn-primary' : 'btn-secondary']" @click="assignMode='area'" style="flex:1">A Grupo / Área</button>
             </div>
+
+            <!-- TAB PERSONA -->
+            <template v-if="assignMode === 'persona'">
+              <input type="text" v-model="filtroAgentes" placeholder="🔍 Buscar agente por nombre o rol..." class="form-control mb-4" />
+              <div class="table-container">
+                <table class="data-table" style="margin-top:0">
+                  <thead>
+                    <tr>
+                      <th>Nombre del Agente</th>
+                      <th>Rol</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="agente in agentesFiltrados" :key="agente.id">
+                      <td>{{ agente.nombreCompleto }}</td>
+                      <td><span class="badge">{{ agente.rol }}</span></td>
+                      <td>
+                        <button class="btn btn-sm btn-primary" style="padding:0.4rem 1rem" @click="confirmarAsignacion({ agenteAsignadoId: agente.id })">
+                          Seleccionar
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-if="agentesFiltrados.length === 0" class="text-center mt-4 text-muted">No se encontraron agentes.</div>
+              </div>
+            </template>
+
+            <!-- TAB AREA -->
+            <template v-if="assignMode === 'area'">
+              <input type="text" v-model="filtroAreas" placeholder="🔍 Buscar área por nombre..." class="form-control mb-4" />
+              <div class="table-container">
+                <table class="data-table" style="margin-top:0">
+                  <thead>
+                    <tr>
+                      <th>Nombre del Área</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="area in areasFiltradas" :key="area.id">
+                      <td><strong>{{ area.nombre }}</strong></td>
+                      <td>
+                        <button class="btn btn-sm btn-primary" style="padding:0.4rem 1rem" @click="confirmarAsignacion({ areaAsignadaId: area.id })">
+                          Delegar a esta Área
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-if="areasFiltradas.length === 0" class="text-center mt-4 text-muted">No se encontraron áreas asociadas a tu nivel.</div>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -133,8 +166,11 @@ const activeTab = ref('pqrs');
 const showModal = ref(false);
 const pqrsSeleccionada = ref(null);
 const filtroAgentes = ref('');
+const filtroAreas = ref('');
+const assignMode = ref('persona');
+const nodosAreas = ref([]);
 
-const isAdmin = computed(() => user.value && (user.value.rol === 'ADMIN' || user.value.rol === 'SUPERADMIN'));
+const canAssign = computed(() => user.value && ['ADMIN', 'SUPERADMIN', 'GESTOR'].includes(user.value.rol));
 
 onMounted(() => {
   const localToken = localStorage.getItem('auth_token');
@@ -167,10 +203,11 @@ const fetchData = async () => {
     const resPqrs = await axios.get(`${backendUrl}/api/pqrs/gestion`, getAxiosConfig());
     solicitudes.value = resPqrs.data.data;
 
-    // Fetch Agentes if ADMIN
-    if (isAdmin.value) {
-      const resAgentes = await axios.get(`${backendUrl}/api/usuarios/agentes`, getAxiosConfig());
-      agentes.value = resAgentes.data.data;
+    // Fetch Agentes if canAssign
+    if (canAssign.value) {
+      const resAsignables = await axios.get(`${backendUrl}/api/usuarios/asignables`, getAxiosConfig());
+      nodosAreas.value = resAsignables.data.data.areas;
+      agentes.value = resAsignables.data.data.usuarios;
     }
   } catch (err) {
     error.value = err.response?.data?.message || 'Error al conectar protegido con la API.';
@@ -179,13 +216,13 @@ const fetchData = async () => {
   }
 };
 
-const asignarAgente = async (pqrsId, agenteId) => {
+const asignarCaso = async (pqrsId, payload) => {
   try {
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    await axios.put(`${backendUrl}/api/pqrs/${pqrsId}/asignar`, { agenteAsignadoId: agenteId }, getAxiosConfig());
-    await fetchData(); // reload to reflect assigned names natively
+    await axios.put(`${backendUrl}/api/pqrs/${pqrsId}/asignar`, payload, getAxiosConfig());
+    await fetchData(); // reload
   } catch (err) {
-    alert('Error al asignar el agente. Verifique permisos.');
+    alert('Error denegado: ' + (err.response?.data?.message || 'Verifique permisos jerárquicos.'));
     fetchData(); // reload
   }
 };
@@ -196,9 +233,17 @@ const agentesFiltrados = computed(() => {
   return agentes.value.filter(a => a.nombreCompleto.toLowerCase().includes(search) || a.rol.toLowerCase().includes(search));
 });
 
+const areasFiltradas = computed(() => {
+  if (!filtroAreas.value) return nodosAreas.value;
+  const search = filtroAreas.value.toLowerCase();
+  return nodosAreas.value.filter(a => a.nombre.toLowerCase().includes(search));
+});
+
 const abrirModalAsignacion = (pqrs) => {
   pqrsSeleccionada.value = pqrs;
   filtroAgentes.value = '';
+  filtroAreas.value = '';
+  assignMode.value = 'persona';
   showModal.value = true;
 };
 
@@ -207,8 +252,8 @@ const cerrarModal = () => {
   pqrsSeleccionada.value = null;
 };
 
-const confirmarAsignacion = async (agenteId) => {
-  await asignarAgente(pqrsSeleccionada.value.id, agenteId);
+const confirmarAsignacion = async (payload) => {
+  await asignarCaso(pqrsSeleccionada.value.id, payload);
   cerrarModal();
 };
 

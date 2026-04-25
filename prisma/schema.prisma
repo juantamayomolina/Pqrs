@@ -7,6 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Area {
+  id          Int      @id @default(autoincrement())
+  nombre      String   @unique
+  descripcion String?
+  
+  // Relación recursiva pura (Self-Relation)
+  areaPadreId Int?
+  areaPadre   Area?     @relation("AreaJerarquia", fields: [areaPadreId], references: [id])
+  areasHijas  Area[]    @relation("AreaJerarquia")
+
+  // Relaciones
+  usuarios    Usuario[]
+  pqrsAsignadas Solicitud[]
+}
+
 model Usuario {
   id               Int         @id @default(autoincrement())
   tipoDocumento    String      // Ej. CC, CE, NIT
@@ -16,8 +31,11 @@ model Usuario {
   telefono         String?
   esVulnerable     Boolean     @default(false)
   
-  rol              String      @default("USUARIO_EXTERNO") // USUARIO_EXTERNO, AGENTE, ADMIN
+  rol              String      @default("USUARIO_EXTERNO") // USUARIO_EXTERNO, AGENTE, GESTOR, ADMIN, SUPERADMIN
   passwordHash     String?     
+
+  areaId           Int?
+  area             Area?       @relation(fields: [areaId], references: [id])
 
   solicitudes      Solicitud[] @relation("Radicador")
   solicitudesAsignadas Solicitud[] @relation("Asignadas")
@@ -52,6 +70,9 @@ model Solicitud {
   
   agenteAsignadoId    Int?
   agenteAsignado      Usuario?   @relation("Asignadas", fields: [agenteAsignadoId], references: [id])
+
+  areaAsignadaId      Int?
+  areaAsignada        Area?      @relation(fields: [areaAsignadaId], references: [id])
   
   entidadId           Int
   entidad             Entidad    @relation(fields: [entidadId], references: [id])
