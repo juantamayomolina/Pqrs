@@ -5,7 +5,8 @@
         <h2 class="logo"><router-link to="/">Gestión PQRS</router-link></h2>
         <nav class="main-nav">
           <router-link to="/" class="nav-link active-link">Inicio</router-link>
-          <router-link to="/login" class="nav-link active-link">Acceder al Panel</router-link>
+          <router-link v-if="!isLoggedIn" to="/login" class="nav-link active-link">Acceder al Panel</router-link>
+          <router-link v-else to="/panel" class="nav-link active-link" style="color:var(--primary-color); font-weight:600">Mi Panel Interno</router-link>
           <router-link to="/radicar" class="nav-link btn btn-secondary" style="color:white">Radicar PQRS</router-link>
         </nav>
       </div>
@@ -26,6 +27,47 @@
     </footer>
   </div>
 </template>
+
+<script setup>
+import { ref, watch, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import axios from 'axios';
+
+const route = useRoute();
+const isLoggedIn = ref(false);
+
+const checkLoginStatus = () => {
+  isLoggedIn.value = !!localStorage.getItem('auth_token');
+};
+
+onMounted(() => {
+  checkLoginStatus();
+
+  // Escuchar globalmente si el backend devuelve error de token (401 o 403 de capa de validación)
+  axios.interceptors.response.use(
+    (response) => {
+      return response;
+    },
+    (error) => {
+      if (error.response && (error.response.status === 401)) {
+        // Removemos credenciales para limpiar UI, pero SIN ejecutar router.push('/')
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        checkLoginStatus();
+        console.warn('Sesión expirada interceptada por App.vue. No se forzó ruteo.');
+      }
+      return Promise.reject(error);
+    }
+  );
+});
+
+watch(
+  () => route.path,
+  () => {
+    checkLoginStatus();
+  }
+);
+</script>
 
 <style scoped>
 #layout-wrapper {

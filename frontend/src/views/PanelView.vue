@@ -34,6 +34,7 @@
               <th>Asunto</th>
               <th>Estado</th>
               <th v-if="canAssign">Asignado A</th>
+              <th>Expediente</th>
             </tr>
           </thead>
           <tbody>
@@ -45,12 +46,19 @@
               <td>{{ pqrs.estado }}</td>
               <td v-if="canAssign">
                 <button 
+                  v-if="pqrs.estado !== 'CERRADO'"
                   @click="abrirModalAsignacion(pqrs)" 
                   class="btn btn-sm" 
                   :class="pqrs.agenteAsignadoId || pqrs.areaAsignadaId ? 'btn-secondary' : 'btn-primary'"
                   :style="pqrs.agenteAsignadoId || pqrs.areaAsignadaId ? 'color:white; font-size:0.85rem; padding:0.4rem 0.8rem' : 'font-size:0.85rem; padding:0.4rem 0.8rem'"
                 >
                   {{ pqrs.agenteAsignadoId ? pqrs.agenteAsignado?.nombreCompleto : (pqrs.areaAsignadaId ? pqrs.areaAsignada?.nombre : 'Asignar') }}
+                </button>
+                <div v-else class="badge" style="background:#cbd5e1; color:#475569"><span style="font-size:0.8rem">🔒 Permanente</span></div>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-primary" @click="abrirModalExpediente(pqrs)" style="padding:0.4rem; font-size:0.85rem; margin-left: 0.5rem; background:#3b82f6">
+                  📂 Ver Caso
                 </button>
               </td>
             </tr>
@@ -136,6 +144,78 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Modal de Expediente y Trazabilidad -->
+    <Teleport to="body">
+      <div v-if="showExpediente" class="modal-overlay" @click.self="cerrarExpediente">
+        <div class="modal-content animate-fade-in" style="max-width: 950px; flex-direction: row; padding:0; height: 85vh;">
+          
+          <!-- Lado Izquierdo: Info y Respuestas -->
+          <div style="flex: 2; padding: 2rem; overflow-y: auto; border-right: 1px solid #e2e8f0; position:relative;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #e2e8f0; padding-bottom:1rem; margin-bottom:1.5rem">
+               <h2 style="margin:0; color:var(--primary-color); font-size:1.5rem">Expediente No. {{ expedienteActual?.radicadoAlfaNum }}</h2>
+            </div>
+            
+            <p><strong>Clasificación:</strong> Solicitud de Tipo {{ expedienteActual?.tipo }}</p>
+            <p><strong>Asunto:</strong> {{ expedienteActual?.conceptoMotivo }}</p>
+            <p><strong>Motivación/Descripción:</strong> {{ expedienteActual?.contenido }}</p>
+            
+            <div class="mt-4" style="background:#f8fafc; padding:1.5rem; border-radius:0.5rem; border:1px solid #e2e8f0;">
+              <h4>Respuestas Emitidas y Entabladas ({{ expedienteActual?.respuestas?.length || 0 }})</h4>
+              <div v-for="r in expedienteActual?.respuestas" :key="r.id" style="background:white; padding:1rem; margin-top:1rem; border-left:4px solid #3b82f6; box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+                 <strong>{{ r.tipo }}</strong> <span class="text-muted" style="font-size:0.8rem"> - Uso Interno: {{r.esInterna?'Si':'No'}}</span>
+                 <p style="margin-top:0.5rem; font-size:0.95rem; line-height: 1.5">{{ r.contenido }}</p>
+              </div>
+              <div v-if="!expedienteActual?.respuestas?.length" class="text-muted py-2">Ningún oficio o respuesta ha sido radicado sobre este expediente.</div>
+            </div>
+
+            <div class="mt-4" style="border-top: 2px solid #e2e8f0; padding-top: 1rem;" v-if="expedienteActual?.estado !== 'CERRADO'">
+               <h4>Emitir Oficio o Resolución Normativa</h4>
+               <form @submit.prevent="submitRespuesta" style="margin-top:1rem; background:white; padding:1.5rem; border-radius:8px; border:1px solid #cbd5e1">
+                  <select class="form-control mb-4" v-model="formaRespuesta.tipo" required style="width:100%; padding:0.8rem">
+                     <option value="" disabled selected>Seleccione Sub-Tipo de Oficio (Ley 1755)</option>
+                     <option value="FINAL">Resolución de Fondo / Trámite Final</option>
+                     <option value="PARCIAL">Decisión Parcial (Concede extensión)</option>
+                     <option value="SOLICITUD_AMPLIACION">Requerimiento de Ampliación de Información al Ciudadano</option>
+                     <option value="NO_COMPETENCIA">Rechazo por No Competencia (Devolución a Coordinación)</option>
+                     <option value="DESISTIMIENTO_TACITO">Dictamen de Desistimiento Tácito Legal (Extinción por silencio)</option>
+                  </select>
+                  <textarea v-model="formaRespuesta.contenido" class="form-control mb-4" rows="4" placeholder="Cuerpo normativo, argumentos y resoluciones... (Será notificado)" required></textarea>
+                  <button type="submit" class="btn btn-primary" :disabled="guardandoRespuesta" style="width: 100%; justify-content:center; padding:1rem; font-size:1.1rem">
+                    {{ guardandoRespuesta ? 'Aplicando Resoluciones...' : 'Legalizar y Radicar Oficio' }}
+                  </button>
+               </form>
+            </div>
+            <div v-else class="mt-4 p-4 text-center rounded bg-gray" style="background:#e2e8f0; border-radius:8px">
+               <strong>🔒 Expediente Cerrado</strong>
+               <p style="margin-top:0.5rem">No es posible añadir nuevos oficios a un caso finalizado administrativamente.</p>
+            </div>
+          </div>
+
+          <!-- Lado Derecho: Auditoria / Timeline -->
+          <div style="flex: 1; padding: 2rem; background: #fdfdfd; overflow-y: auto; position:relative; min-width: 350px">
+             <button class="btn-close" @click="cerrarExpediente" style="position:absolute; right:1.5rem; top:1.5rem; z-index:1000">×</button>
+             <h3 style="margin-bottom:2rem; font-size:1.3rem; margin-top:2.5rem"><span style="font-size:1.5rem">🕵️</span> Bitácora Auditoría</h3>
+             
+             <div style="position:relative; margin-left:14px; border-left:3px solid #cbd5e1; padding-left:1.5rem">
+               <div v-for="mov in expedienteActual?.movimientos" :key="mov.id" style="margin-bottom: 2.5rem; position:relative;">
+                  <div style="position:absolute; width:18px; height:18px; background:#fcd34d; border-radius:50%; left:-1.5rem; top:0; transform:translateX(-65%); border:3px solid white; box-shadow:0 0 0 2px #cbd5e1"></div>
+                  <strong style="display:block; color:#0f172a; font-size:0.95rem">{{ mov.accion }}</strong>
+                  <span style="font-size:0.75rem; color:#64748b; font-weight:bold">{{ new Date(mov.fecha).toLocaleString() }}</span>
+                  <p style="margin:0.5rem 0 0 0; font-size:0.9rem; color:#334155">{{ mov.detalle }}</p>
+                  <div v-if="mov.autor" style="margin-top:0.5rem; font-size:0.8rem; background:#f1f5f9; padding:0.3rem 0.5rem; border-radius:4px; display:inline-block; border:1px solid #e2e8f0">👤 Modificado por: <strong>{{ mov.autor.nombreCompleto }}</strong> ({{mov.autor.rol}})</div>
+                  <div v-else style="margin-top:0.5rem; font-size:0.8rem; background:#f1f5f9; padding:0.3rem 0.5rem; border-radius:4px; display:inline-block; border:1px solid #e2e8f0">⚡ Inyección Sistémica o Automática</div>
+               </div>
+               
+               <div v-if="!expedienteActual?.movimientos || expedienteActual?.movimientos.length === 0" class="text-muted">
+                 No hay movimientos registrados en la bitácora aún.
+               </div>
+             </div>
+          </div>
+
+        </div>
+      </div>
+    </Teleport>
       </template>
 
       <template v-if="activeTab === 'db'">
@@ -164,7 +244,12 @@ const activeTab = ref('pqrs');
 
 // Modal state
 const showModal = ref(false);
+const showExpediente = ref(false);
 const pqrsSeleccionada = ref(null);
+const expedienteActual = ref(null);
+const guardandoRespuesta = ref(false);
+const formaRespuesta = ref({ tipo: '', contenido: '' });
+
 const filtroAgentes = ref('');
 const filtroAreas = ref('');
 const assignMode = ref('persona');
@@ -250,6 +335,36 @@ const abrirModalAsignacion = (pqrs) => {
 const cerrarModal = () => {
   showModal.value = false;
   pqrsSeleccionada.value = null;
+};
+
+const abrirModalExpediente = (pqrs) => {
+  expedienteActual.value = pqrs;
+  formaRespuesta.value = { tipo: '', contenido: '' };
+  showExpediente.value = true;
+};
+
+const cerrarExpediente = () => {
+  showExpediente.value = false;
+  expedienteActual.value = null;
+};
+
+const submitRespuesta = async () => {
+  guardandoRespuesta.value = true;
+  try {
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    await axios.post(`${backendUrl}/api/pqrs/${expedienteActual.value.id}/respuesta`, formaRespuesta.value, getAxiosConfig());
+    alert('Operación procesada con éxito y trazada en bitácora transparente.');
+    
+    await fetchData(); // Recargar DB para reflejar el estado actual
+    const actualizado = solicitudes.value.find(s => s.id === expedienteActual.value.id);
+    if(actualizado) expedienteActual.value = actualizado;
+    
+    formaRespuesta.value = { tipo: '', contenido: '' };
+  } catch(e) {
+    alert('Restricción Legal: ' + (e.response?.data?.message || e.message));
+  } finally {
+    guardandoRespuesta.value = false;
+  }
 };
 
 const confirmarAsignacion = async (payload) => {

@@ -2,7 +2,7 @@
   <div class="db-manager">
     <div class="db-header flex justify-between animate-fade-in" style="align-items:center; margin-bottom: 1.5rem; background:white; padding:1.5rem; border-radius:8px">
       <div style="flex:1">
-        <label class="form-label" style="font-weight:bold; color:var(--primary-color)">Seleccionar Tabla Técnica</label>
+        <label class="form-label" style="font-weight:bold; color:var(--primary-color)">Seleccionar Tabla Técnica:&nbsp;</label>
         <select v-model="selectedTable" @change="fetchData" class="form-control mt-2" style="max-width:300px">
           <option value="" disabled>-- Seleccione una Entidad --</option>
           <option v-for="t in tables" :key="t" :value="t">{{ t.toUpperCase() }}</option>
