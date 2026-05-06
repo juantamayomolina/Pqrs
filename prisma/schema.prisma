@@ -39,6 +39,7 @@ model Usuario {
 
   solicitudes      Solicitud[] @relation("Radicador")
   solicitudesAsignadas Solicitud[] @relation("Asignadas")
+  movimientosRealizados Movimiento[] @relation("AutorMovimiento")
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -86,12 +87,14 @@ model Solicitud {
   fechaMaximaRespuesta DateTime
 
   // Metadatos y tracking
-  estado              String     @default("ABIERTO") // ABIERTO, EN_TRAMITE, CERRADO
+  estado              String     @default("ABIERTO") // ABIERTO, EN_TRAMITE, ESPERANDO_AMPLIACION, CERRADO
+  fechaCongelacion    DateTime?  // Registra el stamp cuando entra en ampliación
   
   // Anexos almacenados como String/JSON para propósitos del prototipo
   anexosUrls          String?
 
   respuestas          Respuesta[]
+  movimientos         Movimiento[]
 
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
@@ -100,9 +103,10 @@ model Solicitud {
 model Respuesta {
   id                  Int       @id @default(autoincrement())
   radicadoOficio      String    @unique
-  tipo                String    // Peticion de información, respuesta fondo, traslado
+  tipo                String    // FINAL, PARCIAL, SOLICITUD_AMPLIACION, NO_COMPETENCIA
   contenido           String
   anexosUrls          String?   
+  esInterna           Boolean   @default(false)
   
   fechaRespuesta      DateTime  @default(now())
 
@@ -112,6 +116,19 @@ model Respuesta {
 
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+}
+
+model Movimiento {
+  id              Int      @id @default(autoincrement())
+  accion          String   
+  detalle         String?
+  fecha           DateTime @default(now())
+
+  solicitudId     Int
+  solicitud       Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  
+  autorId         Int?     
+  autor           Usuario?  @relation("AutorMovimiento", fields: [autorId], references: [id])
 }
 
 model ConfiguracionSistema {

@@ -74,6 +74,20 @@
         <p class="text-muted" style="margin-top:1rem; font-size:1.05rem">{{ resultado.contenido }}</p>
       </div>
 
+      <!-- AMPLIACION DE INFORMACION -->
+      <div v-if="resultado.estado === 'ESPERANDO_AMPLIACION'" class="info-box mt-4" style="border-color:#3b82f6; background-color:#eff6ff">
+        <h4 style="color:#1d4ed8; margin-bottom: 1rem;">⚠️ Requerimiento de Ampliación de Información</h4>
+        <p class="text-muted">La autoridad a cargo no ha podido dar respuesta de fondo a su requerimiento porque requiere complementariedad de pruebas o afirmaciones. <strong>(Ley 1755 de 2015)</strong>.</p>
+        <p class="text-muted">Describa aquí la información para reactivar la vigencia de su expediente:</p>
+        
+        <form @submit.prevent="aportarAmpliacion" class="mt-4">
+          <textarea v-model="aporteForm.contenido" class="form-control mb-4" rows="4" placeholder="Detalle aquí las justificaciones o pruebas..." required></textarea>
+          <button type="submit" class="btn btn-primary" :disabled="aportando">
+            {{ aportando ? 'Enviando Registro...' : 'Aportar Documentación Faltante' }}
+          </button>
+        </form>
+      </div>
+
     </div>
   </div>
 </template>
@@ -86,6 +100,9 @@ const radicado = ref('');
 const loading = ref(false);
 const error = ref('');
 const resultado = ref(null);
+
+const aporteForm = ref({ contenido: '' });
+const aportando = ref(false);
 
 const buscarPqr = async () => {
   loading.value = true;
@@ -101,6 +118,21 @@ const buscarPqr = async () => {
        : 'Hubo un error de conexión con el Servidor Central.';
   } finally {
     loading.value = false;
+  }
+};
+
+const aportarAmpliacion = async () => {
+  aportando.value = true;
+  try {
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    await axios.post(`${backendUrl}/api/pqrs/aportar/${resultado.value.radicadoAlfaNum}`, aporteForm.value);
+    alert('Aporte recibido por la entidad. Sus tiempos de respuesta (SLA) han sido reactivados y notificados oficialmente.');
+    aporteForm.value.contenido = '';
+    await buscarPqr(); // Reload
+  } catch(e) {
+    alert('Fallo al procesar el aporte: ' + (e.response?.data?.message || e.message));
+  } finally {
+    aportando.value = false;
   }
 };
 
@@ -122,6 +154,7 @@ const formatDate = (dateStr) => {
 }
 .status-banner.abierto { background-color: var(--primary-color); }
 .status-banner.en_tramite { background-color: #f59e0b; }
+.status-banner.esperando_ampliacion { background-color: #3b82f6; }
 .status-banner.cerrado { background-color: var(--secondary-dark); }
 .info-box {
   background: white;

@@ -51,6 +51,14 @@ const crearSolicitud = async (req, res) => {
         }
       });
 
+      await tx.movimiento.create({
+        data: {
+          accion: 'CREA_SOLICITUD',
+          detalle: 'PQRS ha sido radicada formalmente ante el sistema general.',
+          solicitudId: solicitud.id,
+        }
+      });
+
       return solicitud;
     });
 
@@ -114,7 +122,12 @@ const getGestionPqrs = async (req, res) => {
         usuario: true,
         entidad: true,
         agenteAsignado: { select: { id: true, nombreCompleto: true, email: true } },
-        areaAsignada: { select: { id: true, nombre: true } }
+        areaAsignada: { select: { id: true, nombre: true } },
+        respuestas: true,
+        movimientos: {
+          orderBy: { fecha: 'asc' },
+          include: { autor: { select: { nombreCompleto: true, rol: true } } }
+        }
       },
       orderBy: { fechaRadicacion: 'desc' }
     });
@@ -132,6 +145,10 @@ const asignarPqrs = async (req, res) => {
     
     const { rol, areaId, id: userId } = req.user;
 
+    const solicitudActual = await prisma.solicitud.findUnique({ where: { id: parseInt(id) } });
+    if (!solicitudActual) return res.status(404).json({ message: 'La solicitud no existe.' });
+    if (solicitudActual.estado === 'CERRADO') return res.status(400).json({ message: 'Asignación denegada. El expediente se encuentra cerrado de manera definitiva y es inmutable.' });
+
     // Boundary Enforcer for GESTOR
     if (rol === 'GESTOR') {
       const validAreas = await getSubTreeIds(areaId);
@@ -141,7 +158,7 @@ const asignarPqrs = async (req, res) => {
       if (agenteAsignadoId && parseInt(agenteAsignadoId) !== userId) {
         const agInfo = await prisma.usuario.findUnique({ where: { id: parseInt(agenteAsignadoId) }});
         if (!agInfo || !validAreas.includes(agInfo.areaId)) {
-          return res.status(403).json({ message: 'El agente seleccionado no pertenece a tu radio de áreas hijas.'});
+          return res.status(403).json({ message: 'Error de jerarquía. No puedes re-asignar a un funcionario fuera de tu cadena de mando descendiente.' });
         }
       }
     }
@@ -154,10 +171,151 @@ const asignarPqrs = async (req, res) => {
       }
     });
 
+    let logMsg = 'Caso desasignado o regresado a estado neutro.';
+    if (agenteAsignadoId) {
+      const agInfo = await prisma.usuario.findUnique({ where: { id: parseInt(agenteAsignadoId) }});
+      logMsg = `Expediente re-asignado al escritorio de: ${agInfo?.nombreCompleto || 'Agente'}`;
+    } else if (areaAsignadaId) {
+      const arInfo = await prisma.area.findUnique({ where: { id: parseInt(areaAsignadaId) }});
+      logMsg = `Expediente trasladado con destino al Área/División: ${arInfo?.nombre || 'Área'}`;
+    }
+
+    await prisma.movimiento.create({
+      data: {
+        accion: 'RE_ASIGNACION',
+        detalle: logMsg,
+        solicitudId: parseInt(id),
+        autorId: userId
+      }
+    });
+
     res.status(200).json({ message: 'Actualización exitosa', data: solicitud });
   } catch (error) {
     res.status(500).json({ message: 'Error al asignar agente', error: error.message });
   }
 }
 
-module.exports = { crearSolicitud, obtenerSolicitud, getGestionPqrs, asignarPqrs };
+const emitirRespuesta = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tipo, contenido, anexosUrls } = req.body;
+    const { id: userId } = req.user;
+
+    const solicitud = await prisma.solicitud.findUnique({
+      where: { id: parseInt(id) },
+      include: { respuestas: true }
+    });
+
+    if (!solicitud) return res.status(404).json({ message: 'No encontrada' });
+    if (solicitud.estado === 'CERRADO') return res.status(400).json({ message: 'El caso ya se encuentra cerrado estructuralmente.'});
+
+    const ahora = new Date();
+    if (tipo === 'PARCIAL') {
+      const tieneParcial = solicitud.respuestas.some(r => r.tipo === 'PARCIAL');
+      if (tieneParcial) return res.status(400).json({ message: 'Solo te es permitido emitir una única respuesta de carácter PARCIAL según normativa.' });
+    }
+
+    if (tipo === 'SOLICITUD_AMPLIACION' || tipo === 'NO_COMPETENCIA') {
+      const diffMs = ahora - solicitud.fechaRadicacion;
+      const diffDiasCalendario = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      // La regla establece 5 días hábiles, se evalúa restrictivamente con un umbral estricto por ahora
+      if (diffDiasCalendario > 7) { 
+         return res.status(403).json({ message: 'Acción bloqueada: Esta opción solo puede seleccionarse dentro de los primeros 5-7 días de recepción del requerimiento original.' });
+      }
+    }
+
+    let nuevoEstado = solicitud.estado;
+    let nuevaFechaCongelacion = solicitud.fechaCongelacion;
+    let agenteId = solicitud.agenteAsignadoId;
+
+    if (tipo === 'FINAL' || tipo === 'DESISTIMIENTO_TACITO') {
+      nuevoEstado = 'CERRADO';
+    } else if (tipo === 'SOLICITUD_AMPLIACION') {
+      nuevoEstado = 'ESPERANDO_AMPLIACION';
+      nuevaFechaCongelacion = ahora;
+    } else if (tipo === 'NO_COMPETENCIA') {
+      agenteId = null; // Reboota el control para que caiga en la bandeja del superior(Area) y deba ser re-delegado.
+    }
+
+    const respuestaFinal = await prisma.$transaction(async (tx) => {
+      const esInterna = tipo === 'NO_COMPETENCIA';
+      const radResp = `RTA-${solicitud.radicadoAlfaNum}-${Math.floor(Math.random()*1000)}`;
+      
+      const respuestaDb = await tx.respuesta.create({
+        data: {
+          radicadoOficio: radResp,
+          tipo,
+          contenido: contenido || `Mecanismo invocado: ${tipo}`,
+          anexosUrls,
+          esInterna,
+          solicitudId: solicitud.id
+        }
+      });
+
+      await tx.solicitud.update({
+        where: { id: solicitud.id },
+        data: { 
+          estado: nuevoEstado, 
+          fechaCongelacion: nuevaFechaCongelacion,
+          agenteAsignadoId: agenteId 
+        }
+      });
+
+      await tx.movimiento.create({
+        data: {
+          accion: `RESPUESTA_${tipo}`,
+          detalle: `Autoridad Interna emitió resolución transitoria o final tipo: ${tipo}. [Estado actual resultante: ${nuevoEstado}]`,
+          solicitudId: solicitud.id,
+          autorId: userId
+        }
+      });
+
+      return respuestaDb;
+    });
+
+    res.status(201).json({ message: 'Tramite emitido satisfactoriamente', data: respuestaFinal });
+  } catch (err) {
+    res.status(500).json({ message: 'Error procesando respuesta', error: err.message });
+  }
+}
+
+const aportarInformacion = async (req, res) => {
+  try {
+    const { radicado } = req.params;
+    const { contenido, anexosUrls } = req.body;
+
+    const solicitud = await prisma.solicitud.findUnique({ where: { radicadoAlfaNum: radicado }});
+    if(!solicitud) return res.status(404).json({ message: 'PQRS inválida' });
+    if(solicitud.estado !== 'ESPERANDO_AMPLIACION') return res.status(400).json({ message: 'Este radicado no está en fase de ampliación probatoria.' });
+
+    // Matematica legal: Descongelar el SLA reactivando los términos, sumando el delay que se tomó el ciudadano al deadline maximo
+    let nuevaFechaMax = solicitud.fechaMaximaRespuesta;
+    if (solicitud.fechaCongelacion) {
+      const congeladosMs = new Date() - solicitud.fechaCongelacion;
+      nuevaFechaMax = new Date(solicitud.fechaMaximaRespuesta.getTime() + congeladosMs);
+    }
+
+    const txRes = await prisma.$transaction(async (tx) => {
+      const up = await tx.solicitud.update({
+        where: { id: solicitud.id },
+        data: { estado: 'EN_TRAMITE', fechaCongelacion: null, fechaMaximaRespuesta: nuevaFechaMax }
+      });
+      await tx.movimiento.create({
+        data: { accion: 'AMPLIACION_CIUDADANO', detalle: 'El ciudadano aportó evidencias solicitadas. Plazos y SLA han sido descongelados oficialmente. Caso retorna a trámite.', solicitudId: solicitud.id }
+      });
+      if(contenido) {
+        await tx.respuesta.create({
+          data: { radicadoOficio: `AMPL-${solicitud.radicadoAlfaNum}-${Math.floor(Math.random()*100)}`, tipo: 'APORTE_CIUDADANO', contenido, anexosUrls, esInterna: false, solicitudId: solicitud.id }
+        });
+      }
+      return up;
+    });
+
+    res.status(200).json({ message: 'Ampliación recibida con éxito.', data: txRes });
+  } catch(e) {
+    res.status(500).json({ message: 'Fallo al procesar aportación temporal', error: e.message });
+  }
+}
+
+module.exports = { crearSolicitud, obtenerSolicitud, getGestionPqrs, asignarPqrs, emitirRespuesta, aportarInformacion };
