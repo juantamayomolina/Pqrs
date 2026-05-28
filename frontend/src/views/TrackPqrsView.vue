@@ -81,7 +81,16 @@
         <p class="text-muted">Describa aquí la información para reactivar la vigencia de su expediente:</p>
         
         <form @submit.prevent="aportarAmpliacion" class="mt-4">
-          <textarea v-model="aporteForm.contenido" class="form-control mb-4" rows="4" placeholder="Detalle aquí las justificaciones o pruebas..." required></textarea>
+          <textarea v-model="aporteForm.contenido" class="form-control mb-4" rows="4" placeholder="Detalle aquí las justificaciones o pruebas... (Requerido)" required></textarea>
+          
+          <div class="form-group mb-4 p-3" style="background:white; border:1px solid #cbd5e1; border-radius:8px">
+            <label class="form-label mb-2" style="font-weight:600">📎 Cargar Evidencia Adicional (Obligatorio/Opcional)</label>
+            <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.txt" @change="handleFileUploadTrack" class="form-control" />
+            <div v-if="archivosTrack.length > 0" class="mt-2 text-muted" style="font-size:0.8rem; font-weight:600">
+              Usted anexará: {{ archivosTrack.length }} fichero(s).
+            </div>
+          </div>
+
           <button type="submit" class="btn btn-primary" :disabled="aportando">
             {{ aportando ? 'Enviando Registro...' : 'Aportar Documentación Faltante' }}
           </button>
@@ -103,6 +112,11 @@ const resultado = ref(null);
 
 const aporteForm = ref({ contenido: '' });
 const aportando = ref(false);
+const archivosTrack = ref([]);
+
+const handleFileUploadTrack = (e) => {
+  archivosTrack.value = Array.from(e.target.files);
+};
 
 const buscarPqr = async () => {
   loading.value = true;
@@ -125,9 +139,22 @@ const aportarAmpliacion = async () => {
   aportando.value = true;
   try {
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    await axios.post(`${backendUrl}/api/pqrs/aportar/${resultado.value.radicadoAlfaNum}`, aporteForm.value);
+    
+    // FrontEnd Fallback Protections
+    let sum = 0;
+    archivosTrack.value.forEach(f => sum += f.size);
+    if(sum > 5 * 1024 * 1024) throw new Error('El volumen sumado de sus archivos sobrepasa 5 MB normativos.');
+    if(archivosTrack.value.length > 5) throw new Error('Superó la cuenta individual (Máx 5). Por favor comprimir en un ZIP.');
+
+    const formData = new FormData();
+    formData.append('contenido', aporteForm.value.contenido);
+    archivosTrack.value.forEach(f => formData.append('archivos', f));
+
+    await axios.post(`${backendUrl}/api/pqrs/aportar/${resultado.value.radicadoAlfaNum}`, formData);
+    
     alert('Aporte recibido por la entidad. Sus tiempos de respuesta (SLA) han sido reactivados y notificados oficialmente.');
     aporteForm.value.contenido = '';
+    archivosTrack.value = [];
     await buscarPqr(); // Reload
   } catch(e) {
     alert('Fallo al procesar el aporte: ' + (e.response?.data?.message || e.message));

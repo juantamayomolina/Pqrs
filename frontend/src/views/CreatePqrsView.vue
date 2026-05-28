@@ -76,6 +76,22 @@
               <label class="form-label">Desarrollo y Contenido</label>
               <textarea v-model="form.contenido" class="form-control" rows="5" placeholder="Exponga los hechos..." required></textarea>
             </div>
+            <div class="form-group mt-4 p-4" style="background:#f1f5f9; border:1px dashed #cbd5e1; border-radius:8px">
+              <label class="form-label mb-2" style="font-weight:bold; color:var(--primary-dark)">📎 Anexar Material Probatorio (Máx 5 MB Total)</label>
+              <p class="text-muted" style="font-size:0.85rem; margin-top:0; margin-bottom:1rem">Puede subir hasta 5 adjuntos (PDF, Word, Excel, Imagenes o comprimido ZIP).</p>
+              <input type="file" ref="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.txt" @change="handleFileUpload" class="form-control" style="background:white; padding: 0.5rem" />
+              
+              <div v-if="archivosSeleccionados.length > 0" class="mt-2">
+                <ul style="padding-left: 1.5rem; font-size:0.85rem; color:#475569">
+                  <li v-for="(f, i) in archivosSeleccionados" :key="i">
+                    {{ f.name }} ({{ (f.size / 1024 / 1024).toFixed(2) }} MB)
+                  </li>
+                </ul>
+                <p style="font-weight:bold; font-size:0.9rem" :style="{ color: calculoExcede ? 'var(--danger-color)' : 'var(--success-color)' }">
+                  Peso Estimado Total: {{ (totalSizeCalculado / 1024 / 1024).toFixed(2) }} / 5.00 MB
+                </p>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -98,6 +114,20 @@ const form = ref({
   tipoDocumento: 'CC', numeroDocumento: '', nombreCompleto: '', email: '', esVulnerable: false,
   tipoSolicitud: 'PETICION', conceptoMotivo: '', contenido: ''
 });
+
+const archivosSeleccionados = ref([]);
+const fileInput = ref(null);
+const totalSizeCalculado = ref(0);
+const calculoExcede = ref(false);
+
+const handleFileUpload = (e) => {
+  const files = Array.from(e.target.files);
+  archivosSeleccionados.value = files;
+  let total = 0;
+  for(let file of files) total += file.size;
+  totalSizeCalculado.value = total;
+  calculoExcede.value = total > 5 * 1024 * 1024;
+};
 
 const loading = ref(false);
 const error = ref('');
@@ -147,11 +177,32 @@ const buscarUsuario = async () => {
 };
 
 const submitForm = async () => {
+  if (archivosSeleccionados.value.length > 5) {
+    error.value = 'Ha excedido la cantidad máxima legal de 5 anexos permitidos. Por favor comprimir evidencias amplias en un ZIP.';
+    return;
+  }
+  if (calculoExcede.value) {
+    error.value = 'El peso total de los archivos supera el umbral de 5 MB dictaminado normativamente.';
+    return;
+  }
+
   loading.value = true;
   error.value = '';
   
   try {
-    const res = await axios.post('http://localhost:3000/api/pqrs', form.value);
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    
+    // Serializando el FormData Nativo
+    const formData = new FormData();
+    for (let key in form.value) {
+      formData.append(key, form.value[key]);
+    }
+    for (let i = 0; i < archivosSeleccionados.value.length; i++) {
+        formData.append('archivos', archivosSeleccionados.value[i]);
+    }
+
+    const res = await axios.post(`${backendUrl}/api/pqrs`, formData);
+    
     successData.value = res.data;
     success.value = true;
   } catch (err) {
