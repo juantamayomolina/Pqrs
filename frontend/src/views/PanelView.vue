@@ -160,27 +160,52 @@
             <p><strong>Asunto:</strong> {{ expedienteActual?.conceptoMotivo }}</p>
             <p><strong>Motivación/Descripción:</strong> {{ expedienteActual?.contenido }}</p>
             
+            <div v-if="getAnexos(expedienteActual?.anexosUrls)?.length" class="mt-2" style="background:#f1f5f9; padding:1rem; border-radius:8px">
+              <strong>📎 Anexos Radicados:</strong>
+              <div class="flex gap-2 flex-wrap mt-2">
+                <a :href="`http://localhost:3000${url}`" target="_blank" v-for="(url, i) in getAnexos(expedienteActual?.anexosUrls)" :key="i" class="badge" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.5rem; background:white; border:1px solid #cbd5e1">
+                  <span>📄</span> Visualizar Archivo {{ i + 1 }}
+                </a>
+              </div>
+            </div>
+            
             <div class="mt-4" style="background:#f8fafc; padding:1.5rem; border-radius:0.5rem; border:1px solid #e2e8f0;">
-              <h4>Respuestas Emitidas y Entabladas ({{ expedienteActual?.respuestas?.length || 0 }})</h4>
+              <h4>Actuaciones Emitidas ({{ expedienteActual?.respuestas?.length || 0 }})</h4>
               <div v-for="r in expedienteActual?.respuestas" :key="r.id" style="background:white; padding:1rem; margin-top:1rem; border-left:4px solid #3b82f6; box-shadow:0 1px 3px rgba(0,0,0,0.1)">
                  <strong>{{ r.tipo }}</strong> <span class="text-muted" style="font-size:0.8rem"> - Uso Interno: {{r.esInterna?'Si':'No'}}</span>
                  <p style="margin-top:0.5rem; font-size:0.95rem; line-height: 1.5">{{ r.contenido }}</p>
+                 <div v-if="getAnexos(r.anexosUrls)?.length" class="mt-2 p-2 rounded" style="background:#f8fafc; border:1px dashed #cbd5e1">
+                   <strong style="font-size:0.85rem; color:#64748b">📎 Evidencias de la Resolución:</strong>
+                   <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem">
+                     <a :href="`http://localhost:3000${url}`" target="_blank" v-for="(url, i) in getAnexos(r.anexosUrls)" :key="i" style="font-size:0.8rem; background:white; padding:0.2rem 0.5rem; border-radius:4px; text-decoration:none; border:1px solid #ccc; color:#0f172a; display:inline-flex; align-items:center; gap:0.3rem">
+                       <span>📄</span> Documento Adjunto {{i+1}}
+                     </a>
+                   </div>
+                 </div>
               </div>
               <div v-if="!expedienteActual?.respuestas?.length" class="text-muted py-2">Ningún oficio o respuesta ha sido radicado sobre este expediente.</div>
             </div>
 
             <div class="mt-4" style="border-top: 2px solid #e2e8f0; padding-top: 1rem;" v-if="expedienteActual?.estado !== 'CERRADO'">
-               <h4>Emitir Oficio o Resolución Normativa</h4>
+               <h4>Emitir Actuación</h4>
                <form @submit.prevent="submitRespuesta" style="margin-top:1rem; background:white; padding:1.5rem; border-radius:8px; border:1px solid #cbd5e1">
                   <select class="form-control mb-4" v-model="formaRespuesta.tipo" required style="width:100%; padding:0.8rem">
                      <option value="" disabled selected>Seleccione Sub-Tipo de Oficio (Ley 1755)</option>
-                     <option value="FINAL">Resolución de Fondo / Trámite Final</option>
-                     <option value="PARCIAL">Decisión Parcial (Concede extensión)</option>
-                     <option value="SOLICITUD_AMPLIACION">Requerimiento de Ampliación de Información al Ciudadano</option>
+                     <option value="FINAL">Respuesta Final</option>
+                     <option value="PARCIAL">Respuesta Parcial</option>
+                     <option value="SOLICITUD_AMPLIACION">Solicitud de Ampliación de Información al Usuario</option>
                      <option value="NO_COMPETENCIA">Rechazo por No Competencia (Devolución a Coordinación)</option>
-                     <option value="DESISTIMIENTO_TACITO">Dictamen de Desistimiento Tácito Legal (Extinción por silencio)</option>
+                     <option value="DESISTIMIENTO_TACITO">Desistimiento Tácito (Extinción por silencio)</option>
                   </select>
-                  <textarea v-model="formaRespuesta.contenido" class="form-control mb-4" rows="4" placeholder="Cuerpo normativo, argumentos y resoluciones... (Será notificado)" required></textarea>
+                  <textarea v-model="formaRespuesta.contenido" class="form-control mb-4" rows="4" placeholder="Contenido de la actuación" required></textarea>
+                  
+                  <div class="form-group mb-4 p-3" style="background:white; border:1px solid #cbd5e1; border-radius:8px">
+                    <label class="form-label mb-2" style="font-weight:600">📎 Anexos a la petición (Máx 5)</label>
+                    <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.txt" @change="handleFileUploadPanel" class="form-control" />
+                    <div v-if="archivosRespuesta.length > 0" class="mt-2 text-muted" style="font-size:0.8rem; font-weight:600">
+                      Cargados: {{ archivosRespuesta.length }} documento(s).
+                    </div>
+                  </div>
                   <button type="submit" class="btn btn-primary" :disabled="guardandoRespuesta" style="width: 100%; justify-content:center; padding:1rem; font-size:1.1rem">
                     {{ guardandoRespuesta ? 'Aplicando Resoluciones...' : 'Legalizar y Radicar Oficio' }}
                   </button>
@@ -249,6 +274,16 @@ const pqrsSeleccionada = ref(null);
 const expedienteActual = ref(null);
 const guardandoRespuesta = ref(false);
 const formaRespuesta = ref({ tipo: '', contenido: '' });
+const archivosRespuesta = ref([]);
+
+const getAnexos = (str) => {
+  if (!str) return [];
+  try { return JSON.parse(str); } catch(e) { return []; }
+};
+
+const handleFileUploadPanel = (e) => {
+  archivosRespuesta.value = Array.from(e.target.files);
+};
 
 const filtroAgentes = ref('');
 const filtroAreas = ref('');
@@ -352,7 +387,24 @@ const submitRespuesta = async () => {
   guardandoRespuesta.value = true;
   try {
     const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    await axios.post(`${backendUrl}/api/pqrs/${expedienteActual.value.id}/respuesta`, formaRespuesta.value, getAxiosConfig());
+    
+    // Limits Checking Local Validation
+    let sum = 0;
+    archivosRespuesta.value.forEach(f => sum += f.size);
+    if(sum > 5 * 1024 * 1024) throw new Error('El archivo cargado supera tu capacidad designada global de 5 MB.');
+    if(archivosRespuesta.value.length > 5) throw new Error('Campaña denegada. Límite máximo son 5 archivos paralelos. Comprime en un solo ZIP.');
+
+    const formData = new FormData();
+    formData.append('tipo', formaRespuesta.value.tipo);
+    formData.append('contenido', formaRespuesta.value.contenido);
+    archivosRespuesta.value.forEach(f => formData.append('archivos', f));
+
+    await axios.post(`${backendUrl}/api/pqrs/${expedienteActual.value.id}/respuesta`, formData, {
+      headers: {
+        Authorization: `Bearer ${token.value}`
+      }
+    });
+
     alert('Operación procesada con éxito y trazada en bitácora transparente.');
     
     await fetchData(); // Recargar DB para reflejar el estado actual
@@ -360,6 +412,7 @@ const submitRespuesta = async () => {
     if(actualizado) expedienteActual.value = actualizado;
     
     formaRespuesta.value = { tipo: '', contenido: '' };
+    archivosRespuesta.value = [];
   } catch(e) {
     alert('Restricción Legal: ' + (e.response?.data?.message || e.message));
   } finally {
