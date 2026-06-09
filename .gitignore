@@ -6,3 +6,6 @@ backup_chat_22042026.txt
 /generated/prisma
 backup_chat_22042026.txt
 uploads/
+prisma/dev.db
+prisma/dev.db
+*.db
