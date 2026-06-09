@@ -11,9 +11,10 @@
       </div>
     </nav>
 
-    <div class="panel-tabs" v-if="user && user.rol === 'SUPERADMIN'">
+    <div class="panel-tabs" v-if="user && ['SUPERADMIN', 'ADMIN'].includes(user.rol)">
       <button :class="['tab-btn', activeTab === 'pqrs' ? 'active' : '']" @click="activeTab = 'pqrs'">Bandeja PQRS</button>
-      <button :class="['tab-btn', activeTab === 'db' ? 'active' : '']" @click="activeTab = 'db'">Gestión de Base de Datos</button>
+      <button :class="['tab-btn', activeTab === 'areas' ? 'active' : '']" @click="activeTab = 'areas'">Gestión de Áreas</button>
+      <button v-if="user.rol === 'SUPERADMIN'" :class="['tab-btn', activeTab === 'db' ? 'active' : '']" @click="activeTab = 'db'">Gestión de Base de Datos</button>
     </div>
 
     <template v-if="activeTab === 'pqrs'">
@@ -243,6 +244,12 @@
     </Teleport>
       </template>
 
+      <template v-if="activeTab === 'areas'">
+        <div class="panel-content animate-fade-in" style="max-width: 1400px; padding: 1rem">
+          <AreasManager />
+        </div>
+      </template>
+
       <template v-if="activeTab === 'db'">
         <div class="panel-content animate-fade-in" style="max-width: 1400px; padding: 1rem">
           <DatabaseManager />
@@ -256,6 +263,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import DatabaseManager from '../components/DatabaseManager.vue';
+import AreasManager from '../components/AreasManager.vue';
 
 const router = useRouter();
 const user = ref(null);
