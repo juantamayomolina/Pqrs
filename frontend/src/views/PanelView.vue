@@ -13,6 +13,7 @@
 
     <div class="panel-tabs" v-if="user && ['SUPERADMIN', 'ADMIN'].includes(user.rol)">
       <button :class="['tab-btn', activeTab === 'pqrs' ? 'active' : '']" @click="activeTab = 'pqrs'">Bandeja PQRS</button>
+      <button :class="['tab-btn', activeTab === 'users' ? 'active' : '']" @click="activeTab = 'users'">Gestión de Usuarios</button>
       <button :class="['tab-btn', activeTab === 'areas' ? 'active' : '']" @click="activeTab = 'areas'">Gestión de Áreas</button>
       <button v-if="user.rol === 'SUPERADMIN'" :class="['tab-btn', activeTab === 'db' ? 'active' : '']" @click="activeTab = 'db'">Gestión de Base de Datos</button>
     </div>
@@ -244,6 +245,12 @@
     </Teleport>
       </template>
 
+      <template v-if="activeTab === 'users'">
+        <div class="panel-content animate-fade-in" style="max-width: 1400px; padding: 1rem">
+          <UsersManager />
+        </div>
+      </template>
+
       <template v-if="activeTab === 'areas'">
         <div class="panel-content animate-fade-in" style="max-width: 1400px; padding: 1rem">
           <AreasManager />
@@ -264,6 +271,7 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import DatabaseManager from '../components/DatabaseManager.vue';
 import AreasManager from '../components/AreasManager.vue';
+import UsersManager from '../components/UsersManager.vue';
 
 const router = useRouter();
 const user = ref(null);

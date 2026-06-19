@@ -33,6 +33,7 @@ model Usuario {
   
   rol              String      @default("USUARIO_EXTERNO") // USUARIO_EXTERNO, AGENTE, GESTOR, ADMIN, SUPERADMIN
   passwordHash     String?     
+  activo           Boolean     @default(true)
 
   areaId           Int?
   area             Area?       @relation(fields: [areaId], references: [id])
