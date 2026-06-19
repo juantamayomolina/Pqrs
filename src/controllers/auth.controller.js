@@ -57,6 +57,10 @@ const login = async (req, res) => {
       return res.status(404).json({ message: 'Usuario no encontrado o no tiene una cuenta activa' });
     }
 
+    if (user.activo === false) {
+      return res.status(401).json({ message: 'Su cuenta ha sido desactivada temporal o permanentemente por administración.' });
+    }
+
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ message: 'Credenciales incorrectas' });
