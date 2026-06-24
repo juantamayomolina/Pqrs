@@ -27,25 +27,58 @@
 
       <div class="table-card glass-panel" v-if="!loading && solicitudes.length > 0">
         <h3>Bandeja de Entrada</h3>
+        
+        <div class="filtros-bandeja" style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+          <input type="text" v-model="filtroTablaRadicado" placeholder="🔍 Buscar por radicado..." class="form-control" style="flex: 1; min-width: 200px" />
+          <select v-model="filtroTablaTipo" class="form-control" style="flex: 1; min-width: 150px">
+            <option value="">Todos los tipos</option>
+            <option value="Peticion">Petición</option>
+            <option value="Queja">Queja</option>
+            <option value="Reclamo">Reclamo</option>
+            <option value="Sugerencia">Sugerencia</option>
+          </select>
+          <select v-model="filtroTablaEstado" class="form-control" style="flex: 1; min-width: 150px">
+            <option value="">Todos los estados</option>
+            <option value="ABIERTO">Abierto</option>
+            <option value="EN_TRAMITE">En Trámite</option>
+            <option value="ESPERANDO_AMPLIACION">Esperando Ampliación</option>
+            <option value="CERRADO">Cerrado</option>
+          </select>
+          <input v-if="canAssign" type="text" v-model="filtroTablaAsignacion" placeholder="🔍 Filtrar asignado a..." class="form-control" style="flex: 1; min-width: 150px" />
+          
+          <select v-model="itemsPerPage" class="form-control" style="width: auto" title="Registros por página">
+            <option :value="5">5 / Pág</option>
+            <option :value="10">10 / Pág</option>
+            <option :value="20">20 / Pág</option>
+            <option :value="50">50 / Pág</option>
+          </select>
+        </div>
+
         <table class="data-table">
           <thead>
             <tr>
-              <th>Radicado</th>
-              <th>Tipo</th>
-              <th>Fecha</th>
+              <th @click="setSort('radicadoAlfaNum')" style="cursor:pointer" title="Ordenar por Radicado">Radicado ⇕</th>
+              <th @click="setSort('tipo')" style="cursor:pointer" title="Ordenar por Tipo">Tipo ⇕</th>
+              <th @click="setSort('fechaRadicacion')" style="cursor:pointer" title="Ordenar por Fecha">Fecha ⇕</th>
               <th>Asunto</th>
-              <th>Estado</th>
+              <th @click="setSort('estado')" style="cursor:pointer" title="Ordenar por Estado">Estado ⇕</th>
+              <th @click="setSort('vencimiento')" style="cursor:pointer" title="Ordenar por Días Restantes">Vencimiento ⇕</th>
               <th v-if="canAssign">Asignado A</th>
               <th>Expediente</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="pqrs in solicitudes" :key="pqrs.id">
+            <tr v-for="pqrs in paginatedSolicitudes" :key="pqrs.id">
               <td><strong>{{ pqrs.radicadoAlfaNum }}</strong></td>
               <td><span class="badge">{{ pqrs.tipo }}</span></td>
               <td>{{ new Date(pqrs.fechaRadicacion).toLocaleDateString() }}</td>
               <td>{{ pqrs.conceptoMotivo }}</td>
               <td>{{ pqrs.estado }}</td>
+              <td>
+                <span :class="obtenerVencimiento(pqrs).class" :style="`background:${obtenerVencimiento(pqrs).bg}; color:${obtenerVencimiento(pqrs).color}`">
+                  {{ obtenerVencimiento(pqrs).text }}
+                </span>
+              </td>
               <td v-if="canAssign">
                 <button 
                   v-if="pqrs.estado !== 'CERRADO'"
@@ -66,6 +99,19 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- Paginación UI -->
+        <div class="pagination-controls" style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; padding: 0.5rem">
+          <span style="font-size:0.9rem; color:#64748b">
+            Mostrando {{ paginatedSolicitudes.length }} de {{ solicitudesFiltradasBandeja.length }} registros
+          </span>
+          <div style="display:flex; gap:0.5rem; align-items:center">
+            <button class="btn btn-secondary btn-sm" @click="prevPage" :disabled="currentPage === 1">Anterior</button>
+            <span style="font-size:0.9rem; font-weight:bold">Pág {{ currentPage }} de {{ totalPages }}</span>
+            <button class="btn btn-secondary btn-sm" @click="nextPage" :disabled="currentPage >= totalPages">Siguiente</button>
+          </div>
+        </div>
+
       </div>
 
       <div v-else-if="!loading && solicitudes.length === 0" class="text-center mt-4" style="padding: 2rem;">
@@ -266,7 +312,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import DatabaseManager from '../components/DatabaseManager.vue';
@@ -280,6 +326,110 @@ const solicitudes = ref([]);
 const agentes = ref([]);
 const loading = ref(true);
 const error = ref('');
+
+const filtroTablaRadicado = ref('');
+const filtroTablaTipo = ref('');
+const filtroTablaEstado = ref('');
+const filtroTablaAsignacion = ref('');
+
+const sortKey = ref('fechaRadicacion');
+const sortOrder = ref('desc');
+
+const setSort = (key) => {
+  if (sortKey.value === key) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortKey.value = key;
+    sortOrder.value = 'asc';
+  }
+};
+
+const getDiasRestantes = (pqrs) => {
+  if (pqrs.estado === 'CERRADO') return 9999;
+  let diasLimite = 15;
+  if (pqrs.tipo && pqrs.tipo.toLowerCase().includes('informacion')) diasLimite = 10;
+  if (pqrs.tipo && pqrs.tipo.toLowerCase().includes('consulta')) diasLimite = 30;
+  
+  const fecha = new Date(pqrs.fechaRadicacion);
+  fecha.setDate(fecha.getDate() + diasLimite);
+  
+  const diff = fecha - new Date();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+};
+
+const obtenerVencimiento = (pqrs) => {
+  if (pqrs.estado === 'CERRADO') return { text: 'Cerrado', class: 'badge', bg: '#e2e8f0', color: '#475569' };
+  
+  const diasRestantes = getDiasRestantes(pqrs);
+
+  if (diasRestantes < 0) {
+    return { text: `${diasRestantes} días`, class: 'badge', bg: '#fee2e2', color: '#dc2626' };
+  } else if (diasRestantes <= 3) {
+    return { text: `Quedan ${diasRestantes} días`, class: 'badge', bg: '#fef3c7', color: '#d97706' };
+  } else {
+    return { text: `Quedan ${diasRestantes} días`, class: 'badge', bg: '#dcfce7', color: '#166534' };
+  }
+};
+
+const solicitudesFiltradasBandeja = computed(() => {
+  let filtradas = solicitudes.value.filter(pqrs => {
+    const matchRadicado = !filtroTablaRadicado.value || pqrs.radicadoAlfaNum.toLowerCase().includes(filtroTablaRadicado.value.toLowerCase());
+    const matchTipo = !filtroTablaTipo.value || pqrs.tipo === filtroTablaTipo.value;
+    const matchEstado = !filtroTablaEstado.value || pqrs.estado === filtroTablaEstado.value;
+    
+    let nombreAsignado = 'Sin Asignar';
+    if (pqrs.agenteAsignadoId && pqrs.agenteAsignado) nombreAsignado = pqrs.agenteAsignado.nombreCompleto;
+    else if (pqrs.areaAsignadaId && pqrs.areaAsignada) nombreAsignado = pqrs.areaAsignada.nombre;
+    
+    const matchAsignacion = !filtroTablaAsignacion.value || nombreAsignado.toLowerCase().includes(filtroTablaAsignacion.value.toLowerCase());
+
+    return matchRadicado && matchTipo && matchEstado && matchAsignacion;
+  });
+
+  filtradas.sort((a, b) => {
+    let valA = a[sortKey.value];
+    let valB = b[sortKey.value];
+    
+    if (sortKey.value === 'vencimiento') {
+      valA = getDiasRestantes(a);
+      valB = getDiasRestantes(b);
+    }
+    
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
+    
+    if (valA < valB) return sortOrder.value === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder.value === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  return filtradas;
+});
+
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
+
+const totalPages = computed(() => {
+  return Math.ceil(solicitudesFiltradasBandeja.value.length / itemsPerPage.value) || 1;
+});
+
+const paginatedSolicitudes = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return solicitudesFiltradasBandeja.value.slice(start, end);
+});
+
+watch([filtroTablaRadicado, filtroTablaTipo, filtroTablaEstado, filtroTablaAsignacion, itemsPerPage], () => {
+  currentPage.value = 1;
+});
+
+const prevPage = () => {
+  if (currentPage.value > 1) currentPage.value--;
+};
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value++;
+};
 
 const activeTab = ref('pqrs');
 
