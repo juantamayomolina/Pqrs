@@ -13,11 +13,32 @@ const crearSolicitud = async (req, res) => {
     // Castear tipos derivados de FormData
     esVulnerable = esVulnerable === 'true' || esVulnerable === true;
 
+    // Buscar la configuración del Tipo de PQRS en DB
+    let tipoConfig = await prisma.tipoPqrs.findFirst({
+      where: {
+        OR: [
+          { codigo: tipoSolicitud ? tipoSolicitud.toUpperCase() : '' },
+          { nombre: tipoSolicitud || '' }
+        ],
+        activo: true
+      }
+    });
+
+    // Validar obligatoriedad de anexos
+    const tieneArchivos = req.files && req.files.length > 0;
+    if (tipoConfig && tipoConfig.requiereAnexoObligatorio && !tieneArchivos) {
+      const msgError = tipoConfig.mensajeAnexoObligatorio || `Es obligatorio adjuntar soporte documental para tramitar una solicitud de tipo ${tipoConfig.nombre}.`;
+      return res.status(400).json({ message: msgError });
+    }
+
     let anexosUrls = null;
-    if (req.files && req.files.length > 0) {
+    if (tieneArchivos) {
       const paths = req.files.map(f => `/uploads/${f.filename}`);
       anexosUrls = JSON.stringify(paths);
     }
+
+    // Determinar término legal en días hábiles
+    const diasHabiles = tipoConfig ? tipoConfig.diasHabiles : obtenerDiasHabilesPorTipo(tipoSolicitud);
 
     const solicitudResult = await prisma.$transaction(async (tx) => {
       // Upsert: Si existe actualiza, si no, crea
@@ -39,7 +60,6 @@ const crearSolicitud = async (req, res) => {
       });
 
       // Lógica de fechas
-      const diasHabiles = obtenerDiasHabilesPorTipo(tipoSolicitud);
       const fechaRadicacion = new Date();
       const fechaMaximaRespuesta = calcularFechaMaximaRespuesta(fechaRadicacion, diasHabiles);
 
@@ -49,7 +69,8 @@ const crearSolicitud = async (req, res) => {
       const solicitud = await tx.solicitud.create({
         data: {
           radicadoAlfaNum: radicadoBase,
-          tipo: tipoSolicitud,
+          tipo: tipoConfig ? tipoConfig.codigo : tipoSolicitud,
+          tipoPqrsId: tipoConfig ? tipoConfig.id : null,
           conceptoMotivo,
           contenido,
           anexosUrls,
@@ -60,7 +81,7 @@ const crearSolicitud = async (req, res) => {
         }
       });
 
-      let detalleExt = 'PQRS ha sido radicada formalmente ante el sistema general.';
+      let detalleExt = `PQRS (${tipoConfig ? tipoConfig.nombre : tipoSolicitud}) ha sido radicada formalmente ante el sistema general.`;
       if (req.files && req.files.length > 0) {
         detalleExt += ` El usuario anexó ${req.files.length} adjuntos como material probatorio / radicación original.`;
       }
@@ -83,6 +104,7 @@ const crearSolicitud = async (req, res) => {
     });
 
   } catch (error) {
+
     console.error(error);
     res.status(500).json({ message: 'Error interno al radicar la PQRS', error: error.message });
   }

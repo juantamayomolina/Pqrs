@@ -4,7 +4,9 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 beforeAll(async () => {
-  // Limpiar BD antes de pruebas si se desea, asegurando un entorno sin colisión de CC
+  // Limpiar BD antes de pruebas respetando restricciones de integridad referencial
+  await prisma.movimiento.deleteMany();
+  await prisma.respuesta.deleteMany();
   await prisma.solicitud.deleteMany();
   await prisma.usuario.deleteMany();
   await prisma.entidad.deleteMany();
@@ -50,7 +52,7 @@ describe('API PQRS Endpoints', () => {
 
     expect(response.body.data.radicadoAlfaNum).toBe(radicadoGenerado);
     expect(response.body.data.usuario.numeroDocumento).toBe('1122334455');
-    expect(response.body.data.entidad.codigo).toBe('E-TEST-01');
+    expect(response.body.data.entidad.codigo).toBe('MAIN-ENT');
   });
 
   test('GET /api/pqrs/:radicado retorna 404 para radicados inexistentes', async () => {

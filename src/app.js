@@ -21,6 +21,7 @@ const usuarioRoutes = require('./routes/usuario.routes');
 const authRoutes = require('./routes/auth.routes');
 const superadminRoutes = require('./routes/superadmin.routes');
 const areaRoutes = require('./routes/area.routes');
+const tipoPqrsRoutes = require('./routes/tipoPqrs.routes');
 
 app.use('/api/pqrs', pqrsRoutes);
 app.use('/api/setup', setupRoutes);
@@ -28,5 +29,7 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/areas', areaRoutes);
+app.use('/api/tipos-pqrs', tipoPqrsRoutes);
 
 module.exports = app;
+

@@ -60,14 +60,19 @@
             <div class="form-group">
               <label class="form-label">Tipo de Solicitud (Clasificación)</label>
               <select v-model="form.tipoSolicitud" class="form-control" required>
-                <option value="PETICION">Petición General (15 días hab.)</option>
-                <option value="QUEJA">Queja (15 días hab.)</option>
-                <option value="RECLAMO">Reclamo (15 días hab.)</option>
-                <option value="SUGERENCIA">Sugerencia (15 días hab.)</option>
-                <option value="INFORMACION">Petición de Info / Docs (10 días hab.)</option>
-                <option value="CONSULTA">Consulta a Entidad (30 días hab.)</option>
+                <option v-for="tipo in tiposPqrs" :key="tipo.id" :value="tipo.codigo">
+                  {{ tipo.nombre }} ({{ tipo.diasHabiles }} días hab.){{ tipo.requiereAnexoObligatorio ? ' 📎 Anexo Obligatorio' : '' }}
+                </option>
               </select>
             </div>
+
+            <div v-if="tipoSeleccionadoObj?.requiereAnexoObligatorio" class="alert alert-warning mb-3" style="background:#fffbeb; border-left:5px solid #f59e0b; color:#92400e; padding:1rem; border-radius:8px;">
+              <strong>⚠️ Adjunto Obligatorio Requerido:</strong>
+              <p style="margin-top:0.3rem; font-size:0.9rem; margin-bottom:0;">
+                {{ tipoSeleccionadoObj.mensajeAnexoObligatorio || 'Para este tipo de solicitud es obligatorio adjuntar el archivo/documento de soporte.' }}
+              </p>
+            </div>
+
             <div class="form-group">
               <label class="form-label">Motivo o Asunto Principal</label>
               <input type="text" v-model="form.conceptoMotivo" class="form-control" placeholder="Ej: Solicitud historia clínica" required />
@@ -77,7 +82,10 @@
               <textarea v-model="form.contenido" class="form-control" rows="5" placeholder="Exponga los hechos..." required></textarea>
             </div>
             <div class="form-group mt-4 p-4" style="background:#f1f5f9; border:1px dashed #cbd5e1; border-radius:8px">
-              <label class="form-label mb-2" style="font-weight:bold; color:var(--primary-dark)">📎 Anexar Material Probatorio (Máx 5 MB Total)</label>
+              <label class="form-label mb-2" style="font-weight:bold; color:var(--primary-dark)">
+                📎 Anexar Material Probatorio (Máx 5 MB Total)
+                <span v-if="tipoSeleccionadoObj?.requiereAnexoObligatorio" style="color:#dc2626;"> * Requerido</span>
+              </label>
               <p class="text-muted" style="font-size:0.85rem; margin-top:0; margin-bottom:1rem">Puede subir hasta 5 adjuntos (PDF, Word, Excel, Imagenes o comprimido ZIP).</p>
               <input type="file" ref="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.txt" @change="handleFileUpload" class="form-control" style="background:white; padding: 0.5rem" />
               
@@ -107,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 
 const form = ref({
@@ -115,6 +123,7 @@ const form = ref({
   tipoSolicitud: 'PETICION', conceptoMotivo: '', contenido: ''
 });
 
+const tiposPqrs = ref([]);
 const archivosSeleccionados = ref([]);
 const fileInput = ref(null);
 const totalSizeCalculado = ref(0);
@@ -137,7 +146,33 @@ const isUserReadOnly = ref(false);
 const isLoggedIn = ref(false);
 const loggedUser = ref(null);
 
+const tipoSeleccionadoObj = computed(() => {
+  return tiposPqrs.value.find(t => t.codigo === form.value.tipoSolicitud) || null;
+});
+
+const cargarTiposPqrs = async () => {
+  try {
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const res = await axios.get(`${backendUrl}/api/tipos-pqrs`);
+    if (res.data && res.data.data) {
+      tiposPqrs.value = res.data.data;
+      if (tiposPqrs.value.length > 0 && !form.value.tipoSolicitud) {
+        form.value.tipoSolicitud = tiposPqrs.value[0].codigo;
+      }
+    }
+  } catch (err) {
+    console.error('Error cargando tipos de PQRS:', err);
+    // Fallback básico si la API no estuviera disponible
+    tiposPqrs.value = [
+      { id: 1, codigo: 'PETICION', nombre: 'Petición General', diasHabiles: 15, requiereAnexoObligatorio: false },
+      { id: 2, codigo: 'QUEJA', nombre: 'Queja', diasHabiles: 15, requiereAnexoObligatorio: false },
+      { id: 3, codigo: 'RECLAMO', nombre: 'Reclamo', diasHabiles: 15, requiereAnexoObligatorio: false }
+    ];
+  }
+};
+
 onMounted(() => {
+  cargarTiposPqrs();
   const token = localStorage.getItem('auth_token');
   const user = localStorage.getItem('auth_user');
   if (token && user) {
@@ -177,6 +212,11 @@ const buscarUsuario = async () => {
 };
 
 const submitForm = async () => {
+  if (tipoSeleccionadoObj.value?.requiereAnexoObligatorio && archivosSeleccionados.value.length === 0) {
+    error.value = tipoSeleccionadoObj.value.mensajeAnexoObligatorio || 'Es obligatorio adjuntar al menos un archivo de soporte para radicar esta solicitud.';
+    return;
+  }
+
   if (archivosSeleccionados.value.length > 5) {
     error.value = 'Ha excedido la cantidad máxima legal de 5 anexos permitidos. Por favor comprimir evidencias amplias en un ZIP.';
     return;
@@ -211,6 +251,7 @@ const submitForm = async () => {
     loading.value = false;
   }
 };
+
 </script>
 
 <style scoped>
