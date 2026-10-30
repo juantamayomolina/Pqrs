@@ -81,8 +81,11 @@ model Solicitud {
 
   // Detalles de PQRS
   conceptoMotivo      String
-  tipo                String     // Peticion, Queja, Reclamo, Sugerencia
+  tipo                String     // Peticion, Queja, Reclamo, Sugerencia, RECURSO_QUEJA, etc.
   contenido           String
+
+  tipoPqrsId          Int?
+  tipoPqrs            TipoPqrs?  @relation(fields: [tipoPqrsId], references: [id])
 
   fechaRadicacion     DateTime   @default(now())
   fechaMaximaRespuesta DateTime
@@ -99,6 +102,22 @@ model Solicitud {
 
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
+}
+
+model TipoPqrs {
+  id                       Int         @id @default(autoincrement())
+  codigo                   String      @unique // Ej. PETICION, RECURSO_QUEJA
+  nombre                   String      // Ej. Recurso de Queja
+  descripcion              String?     // Ej. Procede cuando se rechaza el recurso de reposición
+  diasHabiles              Int         @default(15) // Plazo en días hábiles
+  requiereAnexoObligatorio Boolean     @default(false)
+  mensajeAnexoObligatorio  String?     // Mensaje personalizado si requiere anexo
+  activo                   Boolean     @default(true)
+
+  solicitudes              Solicitud[]
+
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
 }
 
 model Respuesta {
@@ -142,3 +161,4 @@ model ConfiguracionSistema {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+

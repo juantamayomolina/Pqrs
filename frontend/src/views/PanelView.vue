@@ -15,8 +15,10 @@
       <button :class="['tab-btn', activeTab === 'pqrs' ? 'active' : '']" @click="activeTab = 'pqrs'">Bandeja PQRS</button>
       <button :class="['tab-btn', activeTab === 'users' ? 'active' : '']" @click="activeTab = 'users'">Gestión de Usuarios</button>
       <button :class="['tab-btn', activeTab === 'areas' ? 'active' : '']" @click="activeTab = 'areas'">Gestión de Áreas</button>
+      <button :class="['tab-btn', activeTab === 'tipos' ? 'active' : '']" @click="activeTab = 'tipos'">Tipos de PQRS</button>
       <button v-if="user.rol === 'SUPERADMIN'" :class="['tab-btn', activeTab === 'db' ? 'active' : '']" @click="activeTab = 'db'">Gestión de Base de Datos</button>
     </div>
+
 
     <template v-if="activeTab === 'pqrs'">
       <div class="panel-content animate-fade-in">
@@ -303,6 +305,12 @@
         </div>
       </template>
 
+      <template v-if="activeTab === 'tipos'">
+        <div class="panel-content animate-fade-in" style="max-width: 1400px; padding: 1rem">
+          <TiposPqrsManager />
+        </div>
+      </template>
+
       <template v-if="activeTab === 'db'">
         <div class="panel-content animate-fade-in" style="max-width: 1400px; padding: 1rem">
           <DatabaseManager />
@@ -318,8 +326,10 @@ import axios from 'axios';
 import DatabaseManager from '../components/DatabaseManager.vue';
 import AreasManager from '../components/AreasManager.vue';
 import UsersManager from '../components/UsersManager.vue';
+import TiposPqrsManager from '../components/TiposPqrsManager.vue';
 
 const router = useRouter();
+
 const user = ref(null);
 const token = ref('');
 const solicitudes = ref([]);
